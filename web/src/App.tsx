@@ -6,6 +6,8 @@ import { Card } from '@astryxdesign/core/Card';
 import { Heading } from '@astryxdesign/core/Heading';
 import { ProgressBar } from '@astryxdesign/core/ProgressBar';
 import { Selector } from '@astryxdesign/core/Selector';
+import { Skeleton } from '@astryxdesign/core/Skeleton';
+import { Spinner } from '@astryxdesign/core/Spinner';
 import { TextInput } from '@astryxdesign/core/TextInput';
 import { Text } from '@astryxdesign/core/Text';
 import {
@@ -231,7 +233,7 @@ export default function App() {
               <Heading level={1}>Панель лідів</Heading>
             </div>
             <Text type="supporting">
-              Введи свій особистий код доступу. Він визначає, ким підписані твої статуси.
+              Введи свій особистий код доступу
             </Text>
             <TextInput label="Код доступу" type="password" value={code} onChange={setCode} />
             {error && <Banner status="error" title={error} />}
@@ -239,6 +241,7 @@ export default function App() {
               label={busy ? 'Перевіряю…' : 'Увійти'}
               variant="primary"
               onClick={() => void login(code)}
+              isLoading={busy}
               isDisabled={busy || !code}
             />
           </div>
@@ -258,6 +261,17 @@ export default function App() {
 
   return (
     <div style={{ maxWidth: 1440, margin: '0 auto', padding: '24px 20px 60px' }}>
+      {/*
+        Смужка вгорі екрана, поки йде запит. Apps Script відповідає 3-6 секунд —
+        без жодного знаку життя це виглядає як зависла сторінка, і продажник
+        тисне «Оновити» вдруге.
+      */}
+      {busy && (
+        <div style={{ position: 'fixed', insetInline: 0, top: 0, zIndex: 50 }}>
+          <ProgressBar label="Завантаження" isIndeterminate isLabelHidden variant="accent" />
+        </div>
+      )}
+
       <div style={{ ...row(), justifyContent: 'space-between' }}>
         <div style={row(10)}>
           <span style={{ color: 'var(--color-accent)' }}>
@@ -418,21 +432,62 @@ export default function App() {
       </div>
 
       <div style={{ display: 'grid', gap: 16 }}>
-        {filtered.map((lead) => (
-          <LeadCard
-            key={lead.place_id}
-            lead={lead}
-            statuses={statuses}
-            highlight={search.trim()}
-            saving={saving === lead.place_id}
-            onStatus={(s) => void onStatusChange(lead, s)}
-            onZoom={() => setZoom({ id: lead.place_id, name: String(lead['Назва компанії'] ?? '') })}
-          />
-        ))}
+        {/*
+          Поки список оновлюється, показуємо скелети замість старих карток.
+          Інакше при перемиканні вкладки чи оновленні продажник дивиться на
+          дані попередньої вкладки й не розуміє, чи вони вже нові.
+        */}
+        {busy
+          ? Array.from({ length: 4 }, (_, i) => <LeadCardSkeleton key={i} index={i} />)
+          : filtered.map((lead) => (
+              <LeadCard
+                key={lead.place_id}
+                lead={lead}
+                statuses={statuses}
+                highlight={search.trim()}
+                saving={saving === lead.place_id}
+                onStatus={(s) => void onStatusChange(lead, s)}
+                onZoom={() => setZoom({ id: lead.place_id, name: String(lead['Назва компанії'] ?? '') })}
+              />
+            ))}
       </div>
 
       {zoom && <Lightbox id={zoom.id} name={zoom.name} onClose={() => setZoom(null)} />}
     </div>
+  );
+}
+
+/* ───────────────────────── стани завантаження ───────────────────────── */
+
+/**
+ * Скелет картки ліда.
+ *
+ * Форма повторює справжню картку — зі скріншотом зліва, заголовком, рядком
+ * фактів і правою колонкою. Це не косметика: якщо заглушка іншої висоти,
+ * при появі даних сторінка стрибає, і продажник втрачає місце, на яке дивився.
+ *
+ * index дає зсув анімації, тож список «наливається» хвилею, а не блимає весь
+ * одночасно.
+ */
+function LeadCardSkeleton({ index }: { index: number }) {
+  return (
+    <Card>
+      <div style={{ padding: 18, display: 'flex', gap: 18, alignItems: 'flex-start' }}>
+        <Skeleton width={104} height={150} radius={2} index={index} />
+        <div style={{ flex: '1 1 340px', display: 'grid', gap: 10 }}>
+          <Skeleton width="45%" height={22} index={index + 1} />
+          <Skeleton width="70%" height={14} index={index + 2} />
+          <Skeleton width="35%" height={14} index={index + 3} />
+          <Skeleton width="90%" height={14} index={index + 4} />
+          <Skeleton width="80%" height={14} index={index + 5} />
+        </div>
+        <div style={{ minWidth: 240, display: 'grid', gap: 10 }}>
+          <Skeleton width="100%" height={40} index={index + 2} />
+          <Skeleton width="60%" height={14} index={index + 3} />
+          <Skeleton width="100%" height={30} index={index + 4} />
+        </div>
+      </div>
+    </Card>
   );
 }
 
@@ -498,6 +553,7 @@ function LeadCard({
 }) {
   const [open, setOpen] = useState(false);
   const [hasShot, setHasShot] = useState(true);
+  const [shotLoaded, setShotLoaded] = useState(false);
 
   const score = num(lead['Оцінка сайту 1-10']);
   /*
@@ -544,6 +600,7 @@ function LeadCard({
      * зором — видно, де вже працюють, ще до того, як почав читати назви.
      */
     <div
+      className="lead-card"
       style={{
         borderRadius: 12,
         overflow: 'hidden',
@@ -561,11 +618,20 @@ function LeadCard({
               onClick={onZoom}
               title="Збільшити"
             >
+              {/* Скріни важать по 40-100 КБ і тягнуться ліниво під час прокрутки.
+                  Без заглушки на їх місці зяяли б порожні рамки. */}
+              {!shotLoaded && (
+                <div style={{ position: 'absolute', inset: 0 }}>
+                  <Skeleton width="100%" height="100%" radius={2} />
+                </div>
+              )}
               <img
                 className="shot"
                 src={shotUrl(lead.place_id, 'mobile')}
                 alt=""
                 loading="lazy"
+                style={{ opacity: shotLoaded ? 1 : 0, transition: 'opacity 180ms ease' }}
+                onLoad={() => setShotLoaded(true)}
                 onError={() => setHasShot(false)}
               />
             </div>
@@ -651,13 +717,22 @@ function LeadCard({
           {/* ── права колонка: статус і швидкість ── */}
           <div style={{ minWidth: 240, display: 'grid', gap: 12 }}>
             <div>
-              <Selector
-                label="Статус"
-                value={status}
-                onChange={onStatus}
-                isDisabled={saving}
-                options={statusOptions}
-              />
+              <div style={{ position: 'relative' }}>
+                <Selector
+                  label="Статус"
+                  value={status}
+                  onChange={onStatus}
+                  isDisabled={saving}
+                  options={statusOptions}
+                />
+                {/* Запис у таблицю йде через Apps Script і триває секунду-дві.
+                    Без цього знаку незрозуміло, чи зміна взагалі зберігається. */}
+                {saving && (
+                  <span style={{ position: 'absolute', right: 34, bottom: 12 }}>
+                    <Spinner size="sm" aria-label="Зберігаю статус" />
+                  </span>
+                )}
+              </div>
               {/*
                 Кольоровий бейдж під селектом, а не всередині нього: розфарбувати
                 <option> у нативному випадному списку браузери дозволяють
@@ -815,15 +890,28 @@ function Mark({ text, q }: { text: string; q: string }) {
 
 /** Обидва скріни на весь екран: мобільний і десктопний поруч. */
 function Lightbox({ id, name, onClose }: { id: string; name: string; onClose: () => void }) {
+  const [ready, setReady] = useState(false);
+
   return (
     <div className="lightbox" onClick={onClose}>
       <div style={{ display: 'grid', gap: 14, justifyItems: 'center' }}>
         <div style={{ color: '#fff', fontSize: '1.05rem', fontWeight: 600 }}>{name}</div>
+
+        {/* Повнорозмірні скріни важать до 150 КБ — без індикатора вікно
+            відкривається порожнім чорним прямокутником */}
+        {!ready && (
+          <div style={{ padding: 40 }}>
+            <Spinner size="lg" shade="onMedia" label="Завантажую скріншот" />
+          </div>
+        )}
+
         <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', justifyContent: 'center' }}>
           <img
             src={shotUrl(id, 'mobile')}
             alt="мобільна версія"
             style={{ maxHeight: '78vh', maxWidth: '90vw', borderRadius: 10, background: '#fff' }}
+            onLoad={() => setReady(true)}
+            onError={() => setReady(true)}
           />
           <img
             src={shotUrl(id, 'desktop')}
