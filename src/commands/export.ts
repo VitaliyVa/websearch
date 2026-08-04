@@ -1,6 +1,6 @@
 import { loadNiches, loadPreset, requireEnv } from '../config.js';
 import {
-  allSheetRows, allUsage, countPlaces, db, getAudit, getOwnerScore, getPlaces, getPsi,
+  allSheetRows, allUsage, countPlaces, getAudit, getOwnerScore, getPlaces, getPsi,
   getReviewSignal, getScreenshots, saveSheetRow, setStage, type PlaceRow,
 } from '../db/index.js';
 import { cityOf, stateOf } from '../filters/address.js';
@@ -8,16 +8,18 @@ import { mapsUrl } from '../sources/places.js';
 import { formatEvidence } from '../score/owner.js';
 import type { Evidence, SiteAudit } from '../types.js';
 import { log } from '../util/log.js';
-import { markStaleRows, openDoc, syncTab, writeMeta, type SheetRow } from '../export/sheets.js';
+import {
+  clearStaleRows,
+  collectHumanNotes,
+  openDoc,
+  reconcileTab,
+  restoreHumanNotes,
+  syncTab,
+  writeMeta,
+  type HumanNotes,
+  type SheetRow,
+} from '../export/sheets.js';
 import { TABS, type TabKey } from '../export/columns.js';
-
-/** Куди саме поділось місце, якщо його більше нема в жодній експортованій вкладці. */
-function bucketLabel(placeId: string): string {
-  const r = db().prepare('SELECT bucket, reject_reason FROM places WHERE place_id = ?')
-    .get(placeId) as { bucket: string; reject_reason: string | null } | undefined;
-  if (!r) return 'видалено з бази';
-  return r.reject_reason ? `${r.bucket}: ${r.reject_reason}` : r.bucket;
-}
 
 export interface ExportOpts {
   preset: string;
@@ -58,9 +60,24 @@ export async function exportSheets(opts: ExportOpts) {
     for (const p of t.places) placeTab.set(p.place_id, tabName);
   }
 
-  // ── Позначаємо рядки, що покинули свою вкладку.
-  // Робимо ДО синхронізації: інакше новий мешканець рядка отримав би марку.
-  const staleByTab = new Map<TabKey, { rowIndex: number; movedTo: string }[]>();
+  /*
+   * Нотатки продажників зчитуємо ПЕРЕД будь-якими змінами.
+   *
+   * Лід може переїхати між вкладками після переоцінки, і без цього кроку його
+   * статус та коментар лишились би на старому місці, а нова картка з'явилась би
+   * порожньою — тобто робота продажника губилась би при кожному прогоні.
+   */
+  const humanNotes = await collectHumanNotes(doc);
+  log.dim(`нотаток продажників знайдено: ${humanNotes.size}`);
+
+  /*
+   * Повністю очищаємо рядки, що покинули вкладку — разом із place_id.
+   *
+   * Раніше ключ лишався, і панель показувала «привидів»: вона виводить кожен
+   * рядок із заповненим place_id, тож продажник бачив десятки карток
+   * «більше не лід» замість реальних лідів.
+   */
+  const staleByTab = new Map<TabKey, number[]>();
   for (const row of allSheetRows()) {
     const nowIn = placeTab.get(row.place_id);
     if (nowIn === row.tab) continue;
@@ -68,15 +85,27 @@ export async function exportSheets(opts: ExportOpts) {
     const key = (Object.keys(TABS) as TabKey[]).find((k) => TABS[k] === row.tab);
     if (!key) continue;
 
-    const movedTo = nowIn ?? bucketLabel(row.place_id);
     const list = staleByTab.get(key) ?? [];
-    list.push({ rowIndex: row.row_index, movedTo });
+    list.push(row.row_index);
     staleByTab.set(key, list);
   }
 
   for (const [key, stale] of staleByTab) {
-    const n = await markStaleRows(doc, key, stale);
-    if (n) log.warn(`${TABS[key]}: ${n} рядків позначено як неактуальні (переоцінені після PSI/відгуків)`);
+    const n = await clearStaleRows(doc, key, stale);
+    if (n) log.dim(`${TABS[key]}: очищено ${n} рядків, що переїхали в іншу вкладку`);
+  }
+
+  /*
+   * Повне звірення кожної вкладки з фактом.
+   *
+   * Крок вище спирається на sheet_rows, а вона знає лише про поточне
+   * розташування ліда. Осиротілі рядки з минулих прогонів там не значаться,
+   * тому потрібен окремий прохід по реальному вмісту аркуша.
+   */
+  for (const [tabName, t] of target) {
+    const expected = new Set(t.places.map((p) => p.place_id));
+    const n = await reconcileTab(doc, t.key, expected);
+    if (n) log.warn(`${tabName}: прибрано ${n} застарілих рядків`);
   }
 
   // ── Синхронізація
@@ -91,11 +120,20 @@ export async function exportSheets(opts: ExportOpts) {
     totals[tabName] = t.places.length;
     log.ok(`${res.tab}: +${res.inserted} нових, ${res.updated} оновлено`);
 
+    // Повертаємо нотатки тим, хто переїхав сюди з іншої вкладки
+    const toRestore: { rowIndex: number; notes: HumanNotes }[] = [];
     for (const p of t.places) {
       const idx = res.rows.get(p.place_id);
-      if (idx !== undefined) saveSheetRow(p.place_id, tabName, idx);
+      if (idx === undefined) continue;
+      saveSheetRow(p.place_id, tabName, idx);
       setStage(p.place_id, 'exported');
+
+      const notes = humanNotes.get(p.place_id);
+      if (notes) toRestore.push({ rowIndex: idx, notes });
     }
+
+    const restored = await restoreHumanNotes(doc, t.key, toRestore);
+    if (restored) log.dim(`${tabName}: збережено нотатки для ${restored} лідів`);
   }
 
   const usage = allUsage();
@@ -115,9 +153,7 @@ export async function exportSheets(opts: ExportOpts) {
     ['Макс. оцінка сайту для ліда', preset.thresholds.siteScoreMaxForLead],
     ['Мін. кількість відгуків', preset.filters.minUserRatingCount],
     ['—', '—'],
-    ...usage.map(
-      (u) => [`API ${u.api} (${u.month})`, u.count] as [string, number],
-    ),
+    ...usage.map((u) => [`API ${u.api} (${u.month})`, u.count] as [string, number]),
   ]);
 
   log.ok(`експортовано: ${Object.entries(totals).map(([k, v]) => `${k}=${v}`).join(', ')}`);

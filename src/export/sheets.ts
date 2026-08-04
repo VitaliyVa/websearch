@@ -147,40 +147,164 @@ export async function syncTab(
 }
 
 /**
- * Помічає рядки, що покинули вкладку: лід переїхав у Rejected після PSI,
- * або мовний сигнал переоцінено. Без цього продажник продовжував би дзвонити
- * по картці, яку система вже забракувала.
+ * Прибирає рядки, що покинули вкладку.
  *
- * Машинні колонки B..V гасяться, у B ставиться причина. Колонки W.. (нотатки
- * продажників) не чіпаються — історія роботи по ліду має пережити переоцінку.
+ * Раніше тут лишався `place_id`, а гасились лише колонки B..V. Через це в
+ * панелі з'являлись «привиди»: вона показує кожен рядок із заповненим
+ * place_id, і продажник бачив десятки карток «⚠ більше не лід» замість лідів.
+ *
+ * Тепер рядок очищається ПОВНІСТЮ, разом із ключем. Нотатки продажника не
+ * втрачаються: перед очищенням вони зчитуються і переносяться на нове місце
+ * ліда в іншій вкладці — див. collectHumanNotes нижче.
  */
-export async function markStaleRows(
+export async function clearStaleRows(
   doc: GoogleSpreadsheet,
   tabKey: TabKey,
-  staleRowIndexes: { rowIndex: number; movedTo: string }[],
+  rowIndexes: number[],
 ): Promise<number> {
-  if (!staleRowIndexes.length) return 0;
+  if (!rowIndexes.length) return 0;
 
   const title = TABS[tabKey];
   const sheet = doc.sheetsByTitle[title];
   if (!sheet) return 0;
 
-  const maxRow = Math.max(...staleRowIndexes.map((s) => s.rowIndex)) + 1;
+  const maxRow = Math.max(...rowIndexes) + 1;
   await sheet.loadCells({
     startRowIndex: 0, endRowIndex: maxRow,
-    startColumnIndex: 0, endColumnIndex: MACHINE_COL_COUNT,
+    startColumnIndex: 0, endColumnIndex: ALL_COLUMNS.length,
   });
 
-  for (const { rowIndex, movedTo } of staleRowIndexes) {
-    for (let c = 1; c < MACHINE_COL_COUNT; c++) {
+  for (const rowIndex of rowIndexes) {
+    for (let c = 0; c < ALL_COLUMNS.length; c++) {
       const cell = sheet.getCell(rowIndex, c);
-      cell.value = c === 1 ? `⚠ більше не лід — переміщено до "${movedTo}"` : '';
-      cell.backgroundColor = { red: 0.95, green: 0.9, blue: 0.9 };
+      if (cell.value !== null && cell.value !== '') cell.value = '';
+      cell.backgroundColor = { red: 1, green: 1, blue: 1 };
     }
   }
 
   await sheet.saveUpdatedCells();
-  return staleRowIndexes.length;
+  return rowIndexes.length;
+}
+
+/**
+ * Звіряє вкладку з фактом і чистить усе зайве.
+ *
+ * Не покладається на таблицю відповідностей `sheet_rows`: після переїзду ліда
+ * вона вказує вже на нову вкладку, а старий рядок лишається осиротілим і
+ * невидимим для звичайного відсіву. Саме так у панелі накопичились картки
+ * «⚠ більше не лід».
+ *
+ * Тому читаємо реальні place_id з аркуша й прибираємо ті, яких у цій вкладці
+ * бути не повинно.
+ */
+export async function reconcileTab(
+  doc: GoogleSpreadsheet,
+  tabKey: TabKey,
+  expectedIds: Set<string>,
+): Promise<number> {
+  const sheet = doc.sheetsByTitle[TABS[tabKey]];
+  if (!sheet || sheet.rowCount < 2) return 0;
+
+  await sheet.loadCells({
+    startRowIndex: 0, endRowIndex: sheet.rowCount,
+    startColumnIndex: 0, endColumnIndex: 2,
+  });
+
+  const orphans: number[] = [];
+  for (let r = 1; r < sheet.rowCount; r++) {
+    const id = sheet.getCell(r, 0).value;
+    const marker = String(sheet.getCell(r, 1).value ?? '');
+
+    // Рядок-привид: або чужий place_id, або залишок старої мітки
+    const isOrphan =
+      (typeof id === 'string' && id.trim() && !expectedIds.has(id.trim())) ||
+      marker.startsWith('⚠ більше не лід');
+
+    if (isOrphan) orphans.push(r);
+  }
+
+  return orphans.length ? clearStaleRows(doc, tabKey, orphans) : 0;
+}
+
+export interface HumanNotes {
+  status: string;
+  owner: string;
+  date: string;
+  note: string;
+}
+
+/**
+ * Зчитує колонки продажників (W..Z) з усіх вкладок, ключ — place_id.
+ *
+ * Потрібно, щоб нотатки СЛІДУВАЛИ за лідом при переїзді між вкладками.
+ * Інакше переоцінка після PSI знеособлювала б роботу продажника: картка
+ * з'являлась би в новій вкладці порожньою.
+ */
+export async function collectHumanNotes(
+  doc: GoogleSpreadsheet,
+): Promise<Map<string, HumanNotes>> {
+  const out = new Map<string, HumanNotes>();
+
+  // Meta — службова вкладка на 2 колонки, лідів там немає.
+  // Без цього фільтра loadCells падає з "Out of bounds, sheet is 23 by 2".
+  const leadTabs = [TABS.leads, TABS.manual, TABS.noSite, TABS.rejected];
+
+  for (const title of leadTabs) {
+    const sheet = doc.sheetsByTitle[title];
+    if (!sheet || sheet.rowCount < 2) continue;
+    if (sheet.columnCount < ALL_COLUMNS.length) continue;
+
+    await sheet.loadCells({
+      startRowIndex: 0, endRowIndex: sheet.rowCount,
+      startColumnIndex: 0, endColumnIndex: ALL_COLUMNS.length,
+    });
+
+    for (let r = 1; r < sheet.rowCount; r++) {
+      const id = sheet.getCell(r, 0).value;
+      if (typeof id !== 'string' || !id.trim()) continue;
+
+      const val = (c: number) => String(sheet.getCell(r, c).value ?? '').trim();
+      const notes: HumanNotes = {
+        status: val(MACHINE_COL_COUNT),
+        owner: val(MACHINE_COL_COUNT + 1),
+        date: val(MACHINE_COL_COUNT + 2),
+        note: val(MACHINE_COL_COUNT + 3),
+      };
+      // Порожні не зберігаємо — інакше затруть заповнені з іншої вкладки
+      if (notes.status || notes.owner || notes.date || notes.note) {
+        out.set(id.trim(), notes);
+      }
+    }
+  }
+  return out;
+}
+
+/** Записує нотатки продажників у W..Z для рядків, що переїхали. */
+export async function restoreHumanNotes(
+  doc: GoogleSpreadsheet,
+  tabKey: TabKey,
+  rows: { rowIndex: number; notes: HumanNotes }[],
+): Promise<number> {
+  if (!rows.length) return 0;
+  const sheet = doc.sheetsByTitle[TABS[tabKey]];
+  if (!sheet) return 0;
+
+  const maxRow = Math.max(...rows.map((r) => r.rowIndex)) + 1;
+  await sheet.loadCells({
+    startRowIndex: 0, endRowIndex: maxRow,
+    startColumnIndex: MACHINE_COL_COUNT, endColumnIndex: ALL_COLUMNS.length,
+  });
+
+  for (const { rowIndex, notes } of rows) {
+    const vals = [notes.status, notes.owner, notes.date, notes.note];
+    vals.forEach((v, i) => {
+      const cell = sheet.getCell(rowIndex, MACHINE_COL_COUNT + i);
+      if (v && cell.value !== v) cell.value = v;
+    });
+  }
+
+  await sheet.saveUpdatedCells();
+  return rows.length;
 }
 
 /** Службова вкладка: коли прогін, скільки знайдено, скільки квоти витрачено. */

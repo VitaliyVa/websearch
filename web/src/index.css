@@ -1,36 +1,27 @@
-:root {
-  color-scheme: light dark;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
-  --fg-muted: #52525b;
-}
-
-* {
-  box-sizing: border-box;
-}
+/*
+ * Мінімум поверх теми XDS.
+ *
+ * Свідомо НЕ задаємо тут кольори тексту й фону: їх ставить Theme через
+ * токени. Раніше цей файл їх перевизначав і конфліктував з темою.
+ */
 
 body {
   margin: 0;
-  background: #fafafa;
-  color: #18181b;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: var(--color-background-body);
+  color: var(--color-text-primary);
+  min-height: 100vh;
 }
 
 a {
-  color: #2563eb;
+  color: var(--color-accent);
   text-decoration: none;
 }
 a:hover {
   text-decoration: underline;
 }
 
-@media (prefers-color-scheme: dark) {
-  body {
-    background: #0f0f11;
-    color: #e4e4e7;
-  }
-  :root {
-    --fg-muted: #a1a1aa;
-  }
-  a {
-    color: #60a5fa;
-  }
+/* Recharts малює SVG-текст власним кольором — прив'язуємо до теми */
+.recharts-wrapper text {
+  fill: var(--color-text-secondary);
 }
