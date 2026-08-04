@@ -1,0 +1,66 @@
+{
+  "name": "us-diaspora-pilot",
+  "description": "Пілот: 3 метро (Chicago, Sacramento, Brooklyn). Ціль — 150 лідів у межах безкоштовних лімітів Google.",
+
+  "metros": ["chicago", "sacramento", "brooklyn"],
+  "tiers": ["A", "B", "C"],
+
+  "discovery": {
+    "ethnicMode": true,
+    "geoDenseMode": true,
+    "maxPagesPerQuery": 2,
+    "_maxPagesComment": "Було 3. На пілоті 20 задач з'їли 50 запитів замість очікуваних 26 — етнічні запити в щільних районах тягнуть усі 3 сторінки. Третя сторінка Text Search — найменш релевантні збіги, а коштує стільки ж, скільки перша. Знижено до 2, щоб решта прогону вмістилась у безкоштовний ліміт.",
+    "ethnicMarkersLimit": 4,
+    "ethnicNicheTiers": ["A", "B"],
+    "geoDenseTiers": ["A"],
+    "_comment": "Бюджет запитів рахується так: ethnic-standalone (3 метро × 10) + ethnic (3 × 4 маркери × 13 ніш A+B) + geo-dense (3 × ~9 районів × 7 ніш тиру A) ≈ 366 задач. Більшість повертає <20 результатів ⇒ 1 сторінка. Очікувано ~650-750 запитів Text Search Enterprise при ліміті 1000 безкоштовних/міс."
+  },
+
+  "filters": {
+    "minUserRatingCount": 5,
+    "_minUserRatingCountComment": "Поріг живості бізнесу. 5 — ширша воронка, ловить хвилю після 2022.",
+
+    "requireUsAddress": true,
+    "excludeCountryTlds": [".ru", ".by", ".su"],
+    "excludePhonePrefixes": ["+7"],
+
+    "excludeTypes": [
+      "church", "place_of_worship", "synagogue", "mosque", "hindu_temple",
+      "embassy", "local_government_office", "city_hall", "courthouse", "police",
+      "cemetery", "park", "tourist_attraction", "museum", "library",
+      "primary_school", "secondary_school", "university", "school_district",
+      "public_bath", "national_park", "historical_landmark", "monument",
+      "non_profit_organization", "association_or_organization", "community_center"
+    ],
+    "_excludeTypesComment": "Некомерційні заклади сайти не купують. Церкви й громадські центри мають ІДЕАЛЬНИЙ мовний скор (двомовний сайт, кирилиця, hreflang) і забивали б собою верх списку лідів. На пілоті 10 з 12 перших лідів були церквами й консульством України.",
+
+    "modernStackIsRejection": true,
+    "_modernStackComment": "Сайт на Next/Nuxt/Astro/Remix/сучасному Tailwind — не наш лід, у Rejected."
+  },
+
+  "thresholds": {
+    "ownerScoreLead": 55,
+    "ownerScoreManual": 35,
+    "_ownerScoreComment": "≥55 у Leads, 35-54 у Manual review, <35 у Rejected. Поріг знижено з 70 після живого прогону 44 відгуків: мовний сигнал (languageCode) не спрацював ЖОДНОГО разу — діаспора в США пише відгуки англійською. Реальний максимум від відгуків упав з 125 до 60 балів, тому поріг 70 робив недосяжним саме той сегмент, заради якого будувався сигнал імен: асимільований бізнес зі слов'янською клієнтурою. При 70 у ручній черзі застрягали Gastronom Kyiv Market (сайт 1/10, 40% слов. рецензентів) і PROLIFE HOME CARE (80%).",
+
+    "siteScoreMaxForLead": 6,
+    "_siteScoreComment": "Оцінка сайту 1-10; беремо тільки ≤6, тобто справді поганий сайт. 7+ у Rejected."
+  },
+
+  "budget": {
+    "maxTextSearchRequests": 980,
+    "maxPlaceDetailsRequests": 950,
+    "_comment": "Text Search з полями websiteUri/rating/userRatingCount білиться як ENTERPRISE ($35/1000), безкоштовно 1000/міс. Place Details з reviews — Enterprise+Atmosphere (~$40/1000), теж 1000/міс. Ставимо 980/950 із запасом, щоб гарантовано не вийти за $0. Підняти можна прапорцем --allow-paid."
+  },
+
+  "audit": {
+    "fetchTimeoutMs": 12000,
+    "maxHtmlBytes": 1500000,
+    "perHostDelayMs": 300,
+    "enableLangProbe": true,
+    "enableAcceptLanguageProbe": true,
+    "enablePlaywrightFallback": true,
+    "enableScreenshots": true,
+    "enablePsi": true
+  }
+}

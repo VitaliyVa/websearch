@@ -1,0 +1,60 @@
+{
+  "_comment": "tier A — найбільша концентрація слов'янських власників у США + старі сайти + гроші. tier B — платять найбільше. tier C — обсяг. `includedType` з офіційного списку Places (New); null = чистий текстовий запит, бо типу в Google нема (trucking, home care).",
+
+  "niches": [
+    { "key": "home_health_care", "tier": "A", "label": "Home health care agency", "textQuery": "home health care agency",       "includedType": null },
+    { "key": "trucking",         "tier": "A", "label": "Trucking / logistics",   "textQuery": "trucking company",               "includedType": null },
+    { "key": "auto_repair",      "tier": "A", "label": "Auto repair",            "textQuery": "auto repair shop",               "includedType": "car_repair" },
+    { "key": "auto_body",        "tier": "A", "label": "Auto body shop",         "textQuery": "auto body collision repair",     "includedType": null },
+    { "key": "moving",           "tier": "A", "label": "Moving company",         "textQuery": "moving company",                 "includedType": "moving_company" },
+    { "key": "remodeling",       "tier": "A", "label": "Remodeling / contractor","textQuery": "home remodeling contractor",     "includedType": "general_contractor" },
+    { "key": "roofing",          "tier": "A", "label": "Roofing",                "textQuery": "roofing contractor",             "includedType": "roofing_contractor" },
+
+    { "key": "dental",           "tier": "B", "label": "Dental office",          "textQuery": "dental office",                  "includedType": "dentist" },
+    { "key": "medical_clinic",   "tier": "B", "label": "Medical clinic",         "textQuery": "medical clinic",                 "includedType": "doctor" },
+    { "key": "immigration_law",  "tier": "B", "label": "Immigration lawyer",     "textQuery": "immigration attorney",           "includedType": "lawyer" },
+    { "key": "accounting",       "tier": "B", "label": "Tax / accounting",       "textQuery": "tax preparation accounting",     "includedType": "accounting" },
+    { "key": "insurance",        "tier": "B", "label": "Insurance agency",       "textQuery": "insurance agency",               "includedType": "insurance_agency" },
+    { "key": "real_estate",      "tier": "B", "label": "Real estate agency",     "textQuery": "real estate agency",             "includedType": "real_estate_agency" },
+
+    { "key": "grocery",          "tier": "C", "label": "Grocery / deli",         "textQuery": "european grocery store",         "includedType": "grocery_store" },
+    { "key": "bakery",           "tier": "C", "label": "Bakery",                 "textQuery": "bakery",                         "includedType": "bakery" },
+    { "key": "restaurant",       "tier": "C", "label": "Restaurant",             "textQuery": "restaurant",                     "includedType": "restaurant" },
+    { "key": "barber",           "tier": "C", "label": "Barbershop",             "textQuery": "barber shop",                    "includedType": "barber_shop" },
+    { "key": "nail_salon",       "tier": "C", "label": "Nail salon",             "textQuery": "nail salon",                     "includedType": "nail_salon" },
+    { "key": "beauty_salon",     "tier": "C", "label": "Beauty salon",           "textQuery": "beauty salon hair",              "includedType": "beauty_salon" },
+    { "key": "driving_school",   "tier": "C", "label": "Driving school",         "textQuery": "driving school",                 "includedType": null },
+    { "key": "translation",      "tier": "C", "label": "Notary / translation",   "textQuery": "notary translation services",    "includedType": null },
+    { "key": "daycare",          "tier": "C", "label": "Daycare / preschool",    "textQuery": "daycare preschool",              "includedType": "child_care_agency" },
+    { "key": "furniture",        "tier": "C", "label": "Furniture store",        "textQuery": "furniture store",                "includedType": "furniture_store" },
+    { "key": "hvac_plumbing",    "tier": "C", "label": "HVAC / plumbing",        "textQuery": "plumbing hvac service",          "includedType": "plumber" },
+    { "key": "cleaning",         "tier": "C", "label": "Cleaning service",       "textQuery": "house cleaning service",         "includedType": null },
+    { "key": "pharmacy",         "tier": "C", "label": "Pharmacy",               "textQuery": "pharmacy",                       "includedType": "pharmacy" },
+    { "key": "travel_agency",    "tier": "C", "label": "Travel agency",          "textQuery": "travel agency",                  "includedType": "travel_agency" }
+  ],
+
+  "_ethnicComment": "Маркери підставляються перед textQuery у ethnic-режимі. Google робить семантичний матч, тому працює навіть без точного збігу слів у назві.",
+  "ethnicMarkers": [
+    "ukrainian",
+    "russian",
+    "russian speaking",
+    "ukrainian speaking",
+    "slavic",
+    "eastern european",
+    "european"
+  ],
+
+  "_ethnicStandaloneComment": "Запити без ніші — ловлять бізнеси, які самі себе позиціонують етнічно. УВАГА: цей режим не обмежений типом закладу, тому запити мають бути ЯВНО комерційними. Запити на кшталт 'ukrainian church community center' і 'slavic community services' видалено: вони дали церкви, консульство і НГО з ідеальним мовним скором (сайт двомовний, кирилиця, hreflang) — фільтр працював правильно, але оптимізував не те. Такі організації сайти не купують.",
+  "ethnicStandaloneQueries": [
+    "ukrainian business services",
+    "russian store",
+    "russian medical center",
+    "ukrainian bakery deli",
+    "russian food store",
+    "ukrainian restaurant",
+    "russian restaurant",
+    "eastern european market",
+    "russian speaking lawyer",
+    "ukrainian contractor construction"
+  ]
+}

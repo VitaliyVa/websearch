@@ -1,0 +1,175 @@
+{
+  "_comment": "Метро США з найбільшими укр/рос громадами. `hoods` — точкові райони для geo-dense режиму (звичайний нішевий запит, обмежений районом — ловить асимільований бізнес з англомовною назвою). `center`+`ethnicRadiusM` — для ethnic режиму (запит з етнічним маркером по всьому метро).",
+
+  "_todoNextRun": "ВАЖЛИВО для наступного прогону: зараз використовується locationBias (circle), а це М'ЯКА підказка — Google повертає результати й далеко за радіусом. На пілоті запит з біасом на Чикаго повернув ріелтора з Temecula CA і громадський центр з Portland OR. Через це колонка 'метро' в базі бреше. Перейти на locationRestriction з rectangle (жорстке обмеження) — але це вимагає повторного discover, тобто нової квоти, тому не зараз. Поки що місто/штат у таблиці беруться з адреси, а не з metro_key.",
+
+  "chicago": {
+    "label": "Chicago IL",
+    "state": "IL",
+    "center": { "lat": 41.9484, "lng": -87.8556 },
+    "ethnicRadiusM": 45000,
+    "pilot": true,
+    "hoods": [
+      { "name": "Ukrainian Village",  "lat": 41.8990, "lng": -87.6800, "radiusM": 2500 },
+      { "name": "Palatine",           "lat": 42.1103, "lng": -88.0342, "radiusM": 4500 },
+      { "name": "Des Plaines",        "lat": 42.0334, "lng": -87.8834, "radiusM": 4500 },
+      { "name": "Arlington Heights",  "lat": 42.0884, "lng": -87.9806, "radiusM": 4500 },
+      { "name": "Mount Prospect",     "lat": 42.0664, "lng": -87.9373, "radiusM": 3500 },
+      { "name": "Wheeling",           "lat": 42.1392, "lng": -87.9289, "radiusM": 3500 },
+      { "name": "Buffalo Grove",      "lat": 42.1514, "lng": -87.9600, "radiusM": 3500 },
+      { "name": "Niles",              "lat": 42.0189, "lng": -87.8028, "radiusM": 3500 },
+      { "name": "Northbrook",         "lat": 42.1275, "lng": -87.8290, "radiusM": 3500 },
+      { "name": "Schaumburg",         "lat": 42.0334, "lng": -88.0834, "radiusM": 4500 }
+    ]
+  },
+
+  "sacramento": {
+    "label": "Sacramento CA",
+    "state": "CA",
+    "center": { "lat": 38.6488, "lng": -121.3400 },
+    "ethnicRadiusM": 40000,
+    "pilot": true,
+    "hoods": [
+      { "name": "West Sacramento",  "lat": 38.5805, "lng": -121.5302, "radiusM": 4500 },
+      { "name": "Rancho Cordova",   "lat": 38.5891, "lng": -121.3027, "radiusM": 4500 },
+      { "name": "Citrus Heights",   "lat": 38.7071, "lng": -121.2811, "radiusM": 4500 },
+      { "name": "North Highlands",  "lat": 38.6857, "lng": -121.3722, "radiusM": 3500 },
+      { "name": "Carmichael",       "lat": 38.6171, "lng": -121.3283, "radiusM": 3500 },
+      { "name": "Antelope",         "lat": 38.7143, "lng": -121.3608, "radiusM": 3500 },
+      { "name": "Roseville",        "lat": 38.7521, "lng": -121.2880, "radiusM": 4500 },
+      { "name": "Folsom",           "lat": 38.6779, "lng": -121.1761, "radiusM": 4000 }
+    ]
+  },
+
+  "brooklyn": {
+    "label": "Brooklyn / South NYC",
+    "state": "NY",
+    "center": { "lat": 40.5940, "lng": -73.9800 },
+    "ethnicRadiusM": 25000,
+    "pilot": true,
+    "hoods": [
+      { "name": "Brighton Beach",    "lat": 40.5776, "lng": -73.9614, "radiusM": 2000 },
+      { "name": "Sheepshead Bay",    "lat": 40.5865, "lng": -73.9440, "radiusM": 2500 },
+      { "name": "Bensonhurst",       "lat": 40.6015, "lng": -73.9942, "radiusM": 2500 },
+      { "name": "Gravesend",         "lat": 40.5946, "lng": -73.9776, "radiusM": 2000 },
+      { "name": "Midwood",           "lat": 40.6204, "lng": -73.9600, "radiusM": 2500 },
+      { "name": "Coney Island",      "lat": 40.5755, "lng": -73.9707, "radiusM": 2000 },
+      { "name": "Bay Ridge",         "lat": 40.6264, "lng": -74.0299, "radiusM": 2500 },
+      { "name": "Staten Island S",   "lat": 40.5543, "lng": -74.1518, "radiusM": 5000 }
+    ]
+  },
+
+  "philadelphia": {
+    "label": "Philadelphia PA",
+    "state": "PA",
+    "center": { "lat": 40.0700, "lng": -75.0300 },
+    "ethnicRadiusM": 25000,
+    "pilot": false,
+    "hoods": [
+      { "name": "Bustleton",  "lat": 40.0870, "lng": -75.0280, "radiusM": 3500 },
+      { "name": "Somerton",   "lat": 40.1220, "lng": -75.0130, "radiusM": 3500 },
+      { "name": "Rhawnhurst", "lat": 40.0620, "lng": -75.0640, "radiusM": 3000 }
+    ]
+  },
+
+  "cleveland": {
+    "label": "Cleveland OH",
+    "state": "OH",
+    "center": { "lat": 41.4050, "lng": -81.7290 },
+    "ethnicRadiusM": 30000,
+    "pilot": false,
+    "hoods": [
+      { "name": "Parma",       "lat": 41.4048, "lng": -81.7229, "radiusM": 5000 },
+      { "name": "Seven Hills", "lat": 41.3795, "lng": -81.6754, "radiusM": 3000 }
+    ]
+  },
+
+  "portland": {
+    "label": "Portland OR",
+    "state": "OR",
+    "center": { "lat": 45.5150, "lng": -122.5300 },
+    "ethnicRadiusM": 35000,
+    "pilot": false,
+    "hoods": [
+      { "name": "Gresham",   "lat": 45.5001, "lng": -122.4302, "radiusM": 5000 },
+      { "name": "Beaverton", "lat": 45.4871, "lng": -122.8037, "radiusM": 5000 },
+      { "name": "Happy Valley", "lat": 45.4468, "lng": -122.5223, "radiusM": 4000 }
+    ]
+  },
+
+  "seattle": {
+    "label": "Seattle WA",
+    "state": "WA",
+    "center": { "lat": 47.4500, "lng": -122.2300 },
+    "ethnicRadiusM": 40000,
+    "pilot": false,
+    "hoods": [
+      { "name": "Renton",   "lat": 47.4829, "lng": -122.2171, "radiusM": 5000 },
+      { "name": "Kent",     "lat": 47.3809, "lng": -122.2348, "radiusM": 5000 },
+      { "name": "Lynnwood", "lat": 47.8279, "lng": -122.3054, "radiusM": 5000 }
+    ]
+  },
+
+  "losangeles": {
+    "label": "Los Angeles CA",
+    "state": "CA",
+    "center": { "lat": 34.0900, "lng": -118.3600 },
+    "ethnicRadiusM": 40000,
+    "pilot": false,
+    "hoods": [
+      { "name": "West Hollywood", "lat": 34.0900, "lng": -118.3617, "radiusM": 3000 },
+      { "name": "Encino",         "lat": 34.1592, "lng": -118.5012, "radiusM": 4000 },
+      { "name": "Sherman Oaks",   "lat": 34.1511, "lng": -118.4492, "radiusM": 3500 }
+    ]
+  },
+
+  "miami": {
+    "label": "Miami FL",
+    "state": "FL",
+    "center": { "lat": 25.9500, "lng": -80.1300 },
+    "ethnicRadiusM": 30000,
+    "pilot": false,
+    "hoods": [
+      { "name": "Sunny Isles Beach", "lat": 25.9490, "lng": -80.1226, "radiusM": 2500 },
+      { "name": "Hallandale Beach",  "lat": 25.9812, "lng": -80.1484, "radiusM": 3000 },
+      { "name": "Aventura",          "lat": 25.9565, "lng": -80.1392, "radiusM": 2500 }
+    ]
+  },
+
+  "detroit": {
+    "label": "Detroit MI",
+    "state": "MI",
+    "center": { "lat": 42.5100, "lng": -83.0100 },
+    "ethnicRadiusM": 35000,
+    "pilot": false,
+    "hoods": [
+      { "name": "Warren",           "lat": 42.5145, "lng": -83.0146, "radiusM": 5000 },
+      { "name": "Sterling Heights", "lat": 42.5803, "lng": -83.0302, "radiusM": 5000 },
+      { "name": "Hamtramck",        "lat": 42.3928, "lng": -83.0496, "radiusM": 2500 }
+    ]
+  },
+
+  "minneapolis": {
+    "label": "Minneapolis MN",
+    "state": "MN",
+    "center": { "lat": 45.0400, "lng": -93.2500 },
+    "ethnicRadiusM": 30000,
+    "pilot": false,
+    "hoods": [
+      { "name": "Columbia Heights", "lat": 45.0408, "lng": -93.2630, "radiusM": 3500 },
+      { "name": "Blaine",           "lat": 45.1608, "lng": -93.2349, "radiusM": 5000 }
+    ]
+  },
+
+  "charlotte": {
+    "label": "Charlotte NC",
+    "state": "NC",
+    "center": { "lat": 35.1500, "lng": -80.7500 },
+    "ethnicRadiusM": 35000,
+    "pilot": false,
+    "hoods": [
+      { "name": "Matthews",  "lat": 35.1168, "lng": -80.7237, "radiusM": 4000 },
+      { "name": "Mint Hill", "lat": 35.1793, "lng": -80.6473, "radiusM": 4000 }
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+node_modules/
+.env
+secrets/
+*-sa.json
+data/
+!data/.gitkeep
+cache/
+screenshots/
+*.log
+.DS_Store
+.quota-ledger.json
+.quota-ledger.json.tmp
+
+web/node_modules/
+web/dist/
+web/.env

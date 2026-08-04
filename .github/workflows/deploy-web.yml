@@ -1,0 +1,61 @@
+name: Deploy panel to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths: ['web/**', '.github/workflows/deploy-web.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Один деплой за раз; нові пуші скасовують попередній прогін
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Вмикає GitHub Pages програмно при першому прогоні — інакше довелося б
+      # спершу клікати Settings → Pages → Source: GitHub Actions вручну.
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+        working-directory: web
+
+      - run: npm run build
+        working-directory: web
+        env:
+          # GitHub Pages віддає сайт за адресою /<репозиторій>/, а не з кореня.
+          # Без цього всі шляхи до ассетів після деплою ведуть у нікуди.
+          VITE_BASE: /${{ github.event.repository.name }}/
+          # URL веб-застосунку Apps Script. Це НЕ секрет у криптографічному сенсі
+          # (він однаково потрапляє в бандл), але тримати його в змінних
+          # репозиторію зручніше, ніж комітити.
+          VITE_API_URL: ${{ vars.APPS_SCRIPT_URL }}
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web/dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
