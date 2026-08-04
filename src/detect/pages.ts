@@ -11,8 +11,24 @@ export interface StructureResult {
 }
 
 const CATALOG_RE = /\/(menu|shop|store|catalog|catalogue|products?|services?|prices?|pricing|portfolio|gallery)\b/i;
-const ECOM_RE =
-  /(add[- _]?to[- _]?cart|\/cart\b|\/checkout\b|woocommerce|shopping[- _]?cart|data-product-id|snipcart)/i;
+
+/*
+ * E-commerce шукаємо у ДВА заходи, і це не педантизм.
+ *
+ * Раніше один регекс сканував увесь HTML і серед іншого шукав `/checkout`.
+ * Через це юридична фірма Plaksin Law отримала мітку «інтернет-магазин» —
+ * збіг стався на `https://checkout.stripe.com/checkout.js`, звичайному скрипті
+ * прийому платежів. Мітка спрацювала у 26 з 64 лідів, включно з трьома
+ * юристами й кількома клініками, і завищувала оцінку робіт на 8 годин кожному.
+ *
+ * Тому: шляхи cart/checkout перевіряємо лише серед ВНУТРІШНІХ адрес сайту, а в
+ * HTML лишаємо тільки те, що не буває декорацією — кнопку додавання в кошик,
+ * розмітку товару, конкретні рушії магазинів.
+ */
+const ECOM_PATH_RE = /\/(cart|checkout|basket)\b/i;
+const ECOM_HTML_RE =
+  /(add[- _]?to[- _]?cart|woocommerce-cart|wc-block-cart|data-product-id|snipcart|shopping[- _]?cart|plugins\/woocommerce)/i;
+
 const FORM_RE = /<form[^>]*>[\s\S]{0,3000}?<(?:input|textarea)/i;
 
 /**
@@ -95,7 +111,7 @@ export async function detectStructure(baseUrl: string, html: string): Promise<St
     pageCount: Math.max(1, paths.length),
     uniquePageTypes: Math.max(1, types.size),
     hasCatalog: paths.some((p) => CATALOG_RE.test(p)) || CATALOG_RE.test(html.slice(0, 30_000)),
-    hasEcommerce: ECOM_RE.test(html),
+    hasEcommerce: paths.some((p) => ECOM_PATH_RE.test(p)) || ECOM_HTML_RE.test(html),
     hasForms: FORM_RE.test(html),
     languages: Math.max(1, langSegments.size),
     sitemapFound,

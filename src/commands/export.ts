@@ -6,7 +6,11 @@ import {
 import { cityOf, stateOf } from '../filters/address.js';
 import { mapsUrl } from '../sources/places.js';
 import { formatEvidence } from '../score/owner.js';
-import type { Evidence, SiteAudit } from '../types.js';
+import { difficultyFromHours, formatStars } from '../score/difficulty.js';
+import { buildBrief } from '../score/brief.js';
+import { typeLabelUk } from '../export/type-labels.js';
+import { scoreSite } from '../score/quality.js';
+import type { Evidence, PsiResult, SiteAudit } from '../types.js';
 import { log } from '../util/log.js';
 import {
   clearStaleRows,
@@ -157,7 +161,7 @@ export async function exportSheets(opts: ExportOpts) {
   ]);
 
   log.ok(`експортовано: ${Object.entries(totals).map(([k, v]) => `${k}=${v}`).join(', ')}`);
-  log.dim('Колонки W..Z (Статус / Хто веде / Дата / Коментар) скрипт не чіпає — це поле продажників.');
+  log.dim('Колонки X..AA (Статус / Хто веде / Дата / Коментар) скрипт не чіпає — це поле продажників.');
 }
 
 const nicheLabels = (() => {
@@ -185,10 +189,15 @@ function buildRow(p: PlaceRow): SheetRow {
     : rev?.preferred_lang === 'ru' ? 'російська'
     : '—';
 
-  const hours =
-    auditRow?.hours_min != null && auditRow?.hours_max != null
-      ? `${auditRow.hours_min}-${auditRow.hours_max} год`
-      : '—';
+  /*
+   * Складність у зірках замість годин.
+   *
+   * Години лишаються в БД для внутрішнього планування, але продажнику вони
+   * шкодили: «22-33 год» у розмові миттєво перетворюється на ціну, якої ще
+   * ніхто не рахував, і зводить розмову до трудовитрат замість цінності.
+   */
+  const diff = difficultyFromHours(auditRow?.hours_min ?? null, auditRow?.hours_max ?? null);
+  const difficultyCell = diff ? `${formatStars(diff)} ${diff.label}` : '—';
 
   const psiCell =
     psi && (psi.mobile_score != null || psi.desktop_score != null)
@@ -223,6 +232,37 @@ function buildRow(p: PlaceRow): SheetRow {
       ? `${realLocation}  (знайдено через ${foundVia})`
       : realLocation || foundVia || '—';
 
+  /*
+   * Бриф для продажника.
+   *
+   * Маркери застарілості беремо з перерахунку, а не з БД: зберігається лише
+   * підсумковий бал і причини, а маркери — окрема, незалежна від швидкості
+   * ознака. scoreSite чиста, тож перерахунок нічого не коштує.
+   */
+  const psiTyped: PsiResult | null = psi
+    ? {
+        mobileScore: psi.mobile_score,
+        desktopScore: psi.desktop_score,
+        lcpMs: psi.lcp_ms,
+        cls: psi.cls,
+        fetchedAt: psi.fetched_at,
+      }
+    : null;
+
+  const brief = buildBrief({
+    name: p.name,
+    typeLabel: p.primary_type_label ?? nicheLabels.get(p.niche_key ?? '') ?? p.primary_type ?? '',
+    location,
+    rating: p.rating ?? null,
+    reviews: p.user_rating_count ?? null,
+    website: p.website ?? null,
+    audit: a,
+    psi: psiTyped,
+    langLabel,
+    datedMarkers: scoreSite(a, psiTyped, !!p.website).datedMarkers,
+    difficultyLabel: diff?.label ?? null,
+  });
+
   const screenshotCell = p.website
     // Sheets API приймає формули в US-локалі — розділювач аргументів кома, не крапка з комою
     ? `=HYPERLINK("https://pagespeed.web.dev/analysis?url=${encodeURIComponent(p.website)}","${
@@ -233,7 +273,7 @@ function buildRow(p: PlaceRow): SheetRow {
   return [
     p.place_id,                                              // A
     p.name,                                                  // B
-    p.primary_type_label ?? nicheLabels.get(p.niche_key ?? '') ?? p.primary_type ?? '—', // C
+    typeLabelUk(p.primary_type_label) || nicheLabels.get(p.niche_key ?? '') || p.primary_type || '—', // C
     p.tier ?? '—',                                           // D
     location || '—',                                         // E
     p.website ?? '—',                                        // F
@@ -243,7 +283,7 @@ function buildRow(p: PlaceRow): SheetRow {
     socials || '—',                                          // J
     auditRow?.site_score ?? (p.website ? '' : 1),            // K
     auditRow?.site_reasons ?? (p.website ? '' : 'сайту нема взагалі'), // L
-    hours,                                                   // M
+    difficultyCell,                                          // M
     owner?.score ?? '',                                      // N
     langLabel,                                               // O
     formatEvidence([...evidence, ...revEvidence]) || '—',    // P
@@ -253,6 +293,7 @@ function buildRow(p: PlaceRow): SheetRow {
     https,                                                   // T
     p.rating != null ? `${p.rating} / ${p.user_rating_count ?? 0}` : `— / ${p.user_rating_count ?? 0}`, // U
     screenshotCell,                                          // V
+    brief,                                                   // W
   ];
 }
 

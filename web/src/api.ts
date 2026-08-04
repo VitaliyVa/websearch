@@ -21,7 +21,8 @@ export interface Lead extends Record<string, unknown> {
   Соцмережі: string;
   'Оцінка сайту 1-10': number | string;
   'Причини оцінки': string;
-  'Годин розробки': string;
+  /** Зірки 1-5 замість годин: «★★★☆☆ кілька типів сторінок» */
+  'Складність розробки': string;
   'Мовний скор': number | string;
   Мова: string;
   'Докази мови': string;
@@ -31,6 +32,8 @@ export interface Lead extends Record<string, unknown> {
   HTTPS: string;
   'Рейтинг / відгуки': string;
   'Скрін + PSI звіт': string;
+  /** Готовий бриф: що за бізнес, що за сайт, за що зачепитись у розмові */
+  'Опис для продажника': string;
   Статус: string;
   'Хто веде': string;
   'Дата контакту': string;

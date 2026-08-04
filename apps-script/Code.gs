@@ -42,12 +42,33 @@ var TAB_LEADS = 'Leads';
 var TAB_MANUAL = 'Manual review';
 var TAB_NO_SITE = 'NO_SITE';
 
-/** Колонки A..V пише пайплайн, W..Z — продажники. Скрипт торкається лише W..Z. */
-var COL_PLACE_ID = 1; // A
-var COL_STATUS = 23; // W
-var COL_OWNER = 24; // X
-var COL_DATE = 25; // Y
-var COL_NOTE = 26; // Z
+/**
+ * Машинні колонки пише пайплайн, людські — продажники. Скрипт торкається
+ * ЛИШЕ людських.
+ *
+ * Номери колонок навмисно НЕ зашиті. Раніше тут стояло COL_STATUS = 23, і коли
+ * в пайплайн додали колонку «Опис для продажника», усі людські з'їхали на одну
+ * вправо — скрипт почав би писати статус поверх опису, мовчки й щоразу.
+ * Тепер позиція шукається за назвою заголовка, тож розкладку можна міняти
+ * далі, не чіпаючи цей файл.
+ */
+var COL_PLACE_ID = 1; // A — ключ, не змінюється ніколи
+
+var H_STATUS = 'Статус';
+var H_OWNER = 'Хто веде';
+var H_DATE = 'Дата контакту';
+var H_NOTE = 'Коментар';
+
+/** Повертає 1-based номер колонки за назвою заголовка, або 0 якщо немає. */
+function colByName(sheet, name) {
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return 0;
+  var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  for (var c = 0; c < headers.length; c++) {
+    if (String(headers[c]).trim() === name) return c + 1;
+  }
+  return 0;
+}
 
 var STATUSES = [
   'Новий',
@@ -140,7 +161,13 @@ function readTab(ss, name) {
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
 
-  var values = sheet.getRange(1, 1, lastRow, 26).getValues();
+  // Читаємо стільки колонок, скільки їх реально є. Раніше тут стояло 26 —
+  // після додавання «Опису для продажника» остання колонка просто не доїжджала
+  // б до панелі.
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return [];
+
+  var values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
   var headers = values[0];
   var rows = [];
 
@@ -165,7 +192,7 @@ function readTab(ss, name) {
 /* ─────────────────────────  ЗАПИС  ───────────────────────── */
 
 /**
- * Пише ТІЛЬКИ в колонки W..Z і шукає рядок за place_id, а не за номером.
+ * Пише ТІЛЬКИ в людські колонки і шукає рядок за place_id, а не за номером.
  *
  * Номер рядка змінюється щоразу, коли пайплайн перевантажує таблицю з іншим
  * сортуванням — писали б не туди. place_id стабільний назавжди.
@@ -190,17 +217,26 @@ function updateLead(body, who) {
       var lastRow = sheet.getLastRow();
       if (lastRow < 2) continue;
 
+      var cStatus = colByName(sheet, H_STATUS);
+      var cOwner = colByName(sheet, H_OWNER);
+      var cDate = colByName(sheet, H_DATE);
+      var cNote = colByName(sheet, H_NOTE);
+
+      // Без колонки «Статус» писати нікуди. Краще чесна помилка, ніж запис
+      // у випадкову колонку поверх машинних даних.
+      if (!cStatus) continue;
+
       var ids = sheet.getRange(2, COL_PLACE_ID, lastRow - 1, 1).getValues();
       for (var i = 0; i < ids.length; i++) {
         if (String(ids[i][0]).trim() !== placeId) continue;
 
         var rowNum = i + 2;
-        if (body.status !== undefined) sheet.getRange(rowNum, COL_STATUS).setValue(body.status);
+        if (body.status !== undefined) sheet.getRange(rowNum, cStatus).setValue(body.status);
         // «Хто веде» проставляє скрипт за кодом доступу — продажник не може
         // випадково записати чуже ім'я
-        sheet.getRange(rowNum, COL_OWNER).setValue(who);
-        sheet.getRange(rowNum, COL_DATE).setValue(new Date());
-        if (body.note !== undefined) sheet.getRange(rowNum, COL_NOTE).setValue(body.note);
+        if (cOwner) sheet.getRange(rowNum, cOwner).setValue(who);
+        if (cDate) sheet.getRange(rowNum, cDate).setValue(new Date());
+        if (body.note !== undefined && cNote) sheet.getRange(rowNum, cNote).setValue(body.note);
 
         CacheService.getScriptCache().remove('leads_payload');
         return {ok: true, tab: tabs[t], row: rowNum, owner: who};
