@@ -5,8 +5,9 @@ import {
 import { FREE_TIER, paidSpendAllowed, remaining, used } from '../quota.js';
 import { reviewLanguageSignal } from '../detect/reviews-language.js';
 import { QuotaExceeded } from '../sources/places.js';
-import type { Evidence, LangSignal, SiteAudit } from '../types.js';
+import type { Evidence, LangSignal, PsiResult, SiteAudit } from '../types.js';
 import { log, progress } from '../util/log.js';
+import { scoreSite } from '../score/quality.js';
 import { decide } from './audit.js';
 
 export interface ReviewsOpts {
@@ -91,13 +92,35 @@ export async function reviews(opts: ReviewsOpts) {
         ? JSON.parse(auditRow.version_evidence_json)
         : [];
 
+      /*
+       * Перераховуємо вердикт про сайт, а не беремо лише збережений бал.
+       *
+       * У БД лежить число, але не те, ЧОМУ воно таке: чи сайт справді поганий,
+       * чи ми його взагалі не бачили через bot-protection. Без цієї різниці
+       * заблокований сайт із сильним мовним сигналом падав прямо в Ліди.
+       * scoreSite чиста, тож перерахунок нічого не коштує.
+       */
+      const psiRow = getPsi(place.place_id);
+      const psi: PsiResult | null = psiRow
+        ? {
+            mobileScore: psiRow.mobile_score,
+            desktopScore: psiRow.desktop_score,
+            lcpMs: psiRow.lcp_ms,
+            cls: psiRow.cls,
+            fetchedAt: psiRow.fetched_at,
+          }
+        : null;
+      const quality = scoreSite(siteAudit, psi, !!place.website);
+
       const verdict = decide({
         place: { placeId: place.place_id, name: place.name, website: place.website ?? '', typesJson: place.types_json },
         audit: siteAudit,
         lang: siteLang,
         versionEvidence,
-        siteScore10: auditRow?.site_score ?? 1,
-        psiDone: !!getPsi(place.place_id),
+        siteScore10: auditRow?.site_score ?? quality.score10,
+        siteStatus: quality.status,
+        datedMarkers: quality.datedMarkers,
+        psiDone: !!psiRow,
         reviews: signal,
         preset,
       });

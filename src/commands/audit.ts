@@ -83,6 +83,7 @@ export async function audit(opts: AuditOpts) {
             lang: outcome.lang,
             versionEvidence,
             siteScore10: quality.score10,
+            siteStatus: quality.status,
             datedMarkers: quality.datedMarkers,
             psiDone: false,
             reviews: getReviewSignal(place.place_id)
@@ -127,6 +128,14 @@ export interface DecideInput {
   /** hreflang + пробінг + Accept-Language разом; персистяться в site_audits */
   versionEvidence: import('../types.js').Evidence[];
   siteScore10: number;
+  /**
+   * Вердикт про читабельність сайту з scoreSite.
+   *
+   * `blocked` означає, що сторінку віддав bot-protection, а не власник: або
+   * статусом 403/429, або заглушкою на 168 байт з HTTP 202. Ми такий сайт НЕ
+   * бачили, тож судити про нього не можна — ні хвалити, ні лаяти.
+   */
+  siteStatus?: 'ok' | 'dead' | 'blocked' | 'no_site';
   /** Ознаки застарілості, незалежні від швидкості. Наявність рятує лід від відсіву за балом. */
   datedMarkers?: string[];
   /** Чи вже заміряний PSI — від цього залежить, наскільки строгий поріг сайту */
@@ -181,7 +190,37 @@ export function decide(i: DecideInput) {
   // Сайт, який ми не прочитали (bot-protection, таймаут, DNS), не можна судити
   // за мовними сигналами з сайту — їх просто нема. Такий лід іде на ручну
   // перевірку, а не у відсів: заблокований сайт часто і є найкращий лід.
-  const unreadable = !i.audit || !!i.audit.fetchError;
+  /*
+   * `blocked` теж вважається нечитабельним.
+   *
+   * Раніше сюди потрапляв лише fetchError, і заглушка bot-protection з HTTP 202
+   * проходила як звичайна сторінка: Moskalenko Group і Odessa Insurance лежали
+   * в Лідах з оцінкою 1/10 та причинами «не адаптивний», хоча ми бачили тільки
+   * JS-челендж. Продажник пішов би в дзвінок із твердженнями про сайт, якого
+   * ніхто не відкривав.
+   */
+  const unreadable = !i.audit || !!i.audit.fetchError || i.siteStatus === 'blocked';
+
+  /*
+   * Заблокований сайт — на ручну перевірку, а не в Ліди.
+   *
+   * Нечитабельність буває двох різних сортів, і плутати їх дорого.
+   * `fetchError` означає, що сайт справді не відкривається — це чудовий лід,
+   * і він законно лишається в Лідах. `blocked` означає лише, що нас не
+   * пустили: за челенджем може стояти свіжий сайт на React, і оффер «зробимо
+   * вам сайт» прозвучить безглуздо.
+   *
+   * Мовний сигнал тут ні до чого — він рахується з назви й відгуків, а не з
+   * недоступної сторінки, тому сильний скор не робить такий лід готовим.
+   */
+  if (i.siteStatus === 'blocked' && owner.score >= i.preset.thresholds.ownerScoreManual) {
+    setBucket(
+      i.place.placeId,
+      'manual',
+      'сайт закритий bot-protection — що там насправді, видно лише очима',
+    );
+    return { bucket: 'manual' as const, owner };
+  }
 
   if (!unreadable) {
     if (i.preset.filters.modernStackIsRejection && i.audit?.modernFramework) {

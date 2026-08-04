@@ -85,6 +85,8 @@ export async function enrich(opts: EnrichOpts) {
                 lang,
                 versionEvidence,
                 siteScore10: quality.score10,
+                siteStatus: quality.status,
+                datedMarkers: quality.datedMarkers,
                 psiDone: true,
                 reviews: reviewRow ? toReviewSignal(reviewRow) : null,
                 preset,

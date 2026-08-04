@@ -106,6 +106,7 @@ export function rescore(presetName: string, limit: number | null) {
       lang,
       versionEvidence,
       siteScore10: quality.score10,
+      siteStatus: quality.status,
       datedMarkers: quality.datedMarkers,
       psiDone: !!psi,
       reviews: reviewRow ? toReviewSignal(reviewRow) : null,
