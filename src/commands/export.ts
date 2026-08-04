@@ -249,6 +249,8 @@ function buildRow(p: PlaceRow): SheetRow {
       }
     : null;
 
+  const quality = scoreSite(a, psiTyped, !!p.website);
+
   const brief = buildBrief({
     name: p.name,
     typeLabel: p.primary_type_label ?? nicheLabels.get(p.niche_key ?? '') ?? p.primary_type ?? '',
@@ -259,8 +261,9 @@ function buildRow(p: PlaceRow): SheetRow {
     audit: a,
     psi: psiTyped,
     langLabel,
-    datedMarkers: scoreSite(a, psiTyped, !!p.website).datedMarkers,
+    datedMarkers: quality.datedMarkers,
     difficultyLabel: diff?.label ?? null,
+    siteStatus: quality.status,
   });
 
   const screenshotCell = p.website

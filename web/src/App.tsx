@@ -19,6 +19,7 @@ import {
   type Payload,
 } from './api';
 import { BarList, ScoreHistogram, StatusDonut, countBy } from './charts';
+import { statusStyle } from './status';
 import {
   AlertTriangle, ChevronDown, Clock, ExternalLink, Gauge, Globe, Image as ImageIcon,
   Layers, Lock, Logout, Mail, MapPin, Phone, Refresh, ShieldOff, Smartphone,
@@ -535,7 +536,20 @@ function LeadCard({
   if (lead['HTTPS'] === 'НІ') problems.push('без HTTPS');
   if (psiMobile != null && psiMobile < 40) problems.push(`PSI моб ${psiMobile}`);
 
+  const tone = statusStyle(status);
+
   return (
+    /*
+     * Смуга статусу зліва. У списку з десятків карток вона читається periferійним
+     * зором — видно, де вже працюють, ще до того, як почав читати назви.
+     */
+    <div
+      style={{
+        borderRadius: 12,
+        overflow: 'hidden',
+        borderLeft: status ? `4px solid ${tone.color}` : '4px solid transparent',
+      }}
+    >
     <Card>
       <div style={{ padding: 18 }}>
         <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'flex-start' }}>
@@ -593,7 +607,7 @@ function LeadCard({
               <div style={{ ...row(8), marginTop: 8 }}>
                 <span style={row(5)}>
                   <Layers size={15} />
-                  <Text type="supporting">Складність:</Text>
+                  <Text type="supporting">Складність розробки:</Text>
                 </span>
                 <Stars value={stars} size={16} color="#2563eb" />
                 <Text type="supporting">{difficultyLabel(lead['Складність розробки'])}</Text>
@@ -636,13 +650,26 @@ function LeadCard({
 
           {/* ── права колонка: статус і швидкість ── */}
           <div style={{ minWidth: 240, display: 'grid', gap: 12 }}>
-            <Selector
-              label="Статус"
-              value={status}
-              onChange={onStatus}
-              isDisabled={saving}
-              options={statusOptions}
-            />
+            <div>
+              <Selector
+                label="Статус"
+                value={status}
+                onChange={onStatus}
+                isDisabled={saving}
+                options={statusOptions}
+              />
+              {/*
+                Кольоровий бейдж під селектом, а не всередині нього: розфарбувати
+                <option> у нативному випадному списку браузери дозволяють
+                по-різному, і в частині з них це просто ігнорується. Бейдж дає
+                той самий сигнал і виглядає однаково скрізь.
+              */}
+              {status && (
+                <div style={{ marginTop: 8 }}>
+                  <Badge variant={tone.badge} label={status} />
+                </div>
+              )}
+            </div>
             {lead['Хто веде'] && (
               <Text type="supporting" as="div" display="block">
                 веде: <strong>{String(lead['Хто веде'])}</strong>
@@ -695,6 +722,7 @@ function LeadCard({
         )}
       </div>
     </Card>
+    </div>
   );
 }
 

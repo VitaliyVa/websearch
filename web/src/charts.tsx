@@ -18,6 +18,7 @@ import {
   YAxis,
 } from 'recharts';
 import type { Lead } from './api';
+import { statusStyle } from './status';
 
 const PALETTE = ['#2563eb', '#0891b2', '#059669', '#d97706', '#dc2626', '#7c3aed', '#db2777'];
 
@@ -127,10 +128,13 @@ export function StatusDonut({
   statuses: string[];
   title: string;
 }) {
+  // Кольори беремо з того ж джерела, що й картки: інакше «зелене» на діаграмі
+  // й «зелене» біля ліда означали б різне
   const data = ['', ...statuses]
     .map((s) => ({
       name: s || 'Не опрацьовано',
       value: rows.filter((r) => (r['Статус'] ?? '').toString().trim() === s).length,
+      fill: statusStyle(s).color,
     }))
     .filter((d) => d.value > 0);
 
@@ -141,8 +145,8 @@ export function StatusDonut({
       <ResponsiveContainer width="100%" height={200}>
         <PieChart>
           <Pie data={data} dataKey="value" nameKey="name" innerRadius={42} outerRadius={68} paddingAngle={2}>
-            {data.map((d, i) => (
-              <Cell key={d.name} fill={i === 0 ? '#94a3b8' : PALETTE[(i - 1) % PALETTE.length]} />
+            {data.map((d) => (
+              <Cell key={d.name} fill={d.fill} />
             ))}
           </Pie>
           <Tooltip contentStyle={{ fontSize: 12, borderRadius: 6 }} />

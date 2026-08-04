@@ -27,6 +27,15 @@ export interface BriefInput {
   langLabel: string;
   datedMarkers: string[];
   difficultyLabel: string | null;
+  /**
+   * Вердикт scoreSite. Джерело правди про те, чи ми взагалі бачили сайт.
+   *
+   * Без нього бриф судив за статусом відповіді й пропускав заглушки
+   * bot-protection, що віддаються з кодом 2xx: moskalenkogroup.com повертає
+   * HTTP 202 зі 168 байтами, і бриф упевнено писав «сайт односторінковий,
+   * без каталогу й форм» про сайт, який насправді адаптивний і робочий.
+   */
+  siteStatus?: 'ok' | 'dead' | 'blocked' | 'no_site';
 }
 
 const YEAR = new Date().getFullYear();
@@ -67,6 +76,11 @@ function site(i: BriefInput): string {
 
   const a = i.audit;
   if (!a) return 'Сайт вказано, але прочитати його не вдалось.';
+
+  // Нас не пустили — отже про сайт ми не знаємо НІЧОГО. Жодних тверджень.
+  if (i.siteStatus === 'blocked') {
+    return 'Сайт закритий захистом від ботів — ми його не бачили, тому нічого про нього не стверджуємо. Відкрий очима перед дзвінком.';
+  }
 
   if (a.fetchError || (a.httpStatus != null && a.httpStatus >= 500)) {
     /*
@@ -133,6 +147,8 @@ function site(i: BriefInput): string {
 function problems(i: BriefInput): string {
   const a = i.audit;
   if (!i.website) return '';
+  // Про заблокований сайт не перелічуємо «проблеми»: жодної з них ми не бачили
+  if (i.siteStatus === 'blocked') return '';
 
   const bad: string[] = [];
   const readable = a && !a.fetchError;
@@ -173,6 +189,9 @@ function hook(i: BriefInput): string {
 
   if (!i.website) {
     return `Зачіпка: бізнес шукають у Google Maps${many ? ' і активно туди пишуть' : ''}, але перейти нікуди — кожен такий клієнт іде до конкурента з сайтом.`;
+  }
+  if (i.siteStatus === 'blocked') {
+    return 'Зачіпка: спершу відкрий сайт сам. Якщо він сучасний — це не наш клієнт, і краще дізнатись це до дзвінка, а не під час.';
   }
   if (a?.fetchError && !googleSawIt) {
     return 'Зачіпка: посилання з Google веде в нікуди — це видно за 5 секунд прямо під час дзвінка.';
