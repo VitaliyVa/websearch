@@ -101,7 +101,10 @@ export function rescore(presetName: string, limit: number | null) {
 
     const reviewRow = getReviewSignal(place.place_id);
     const verdict = decide({
-      place: { placeId: place.place_id, name: place.name, website: place.website!, typesJson: place.types_json },
+      place: {
+        placeId: place.place_id, name: place.name, website: place.website!,
+        typesJson: place.types_json, userRatingCount: place.user_rating_count,
+      },
       audit,
       lang,
       versionEvidence,

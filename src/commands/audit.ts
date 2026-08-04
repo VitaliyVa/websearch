@@ -78,7 +78,7 @@ export async function audit(opts: AuditOpts) {
           if (quality.status === 'dead') stats.dead++;
 
           const verdict = decide({
-            place: { placeId: place.place_id, name: place.name, website: place.website!, typesJson: place.types_json },
+            place: { placeId: place.place_id, name: place.name, website: place.website!, typesJson: place.types_json, userRatingCount: place.user_rating_count },
             audit: outcome.audit,
             lang: outcome.lang,
             versionEvidence,
@@ -122,7 +122,14 @@ const safeTypes = (json: string | null | undefined): string[] => {
 };
 
 export interface DecideInput {
-  place: { placeId: string; name: string; website: string; typesJson?: string | null };
+  place: {
+    placeId: string;
+    name: string;
+    website: string;
+    typesJson?: string | null;
+    /** Потрібен, щоб переоцінка не воскрешала бізнеси, відсіяні за живістю */
+    userRatingCount?: number | null;
+  };
   audit: SiteAudit | null;
   lang: LangSignal | null;
   /** hreflang + пробінг + Accept-Language разом; персистяться в site_audits */
@@ -164,6 +171,26 @@ export function decide(i: DecideInput) {
   const excludedType = types.find((t) => i.preset.filters.excludeTypes.includes(t));
   if (excludedType) {
     setBucket(i.place.placeId, 'rejected', `некомерційний заклад (${excludedType})`);
+    return { bucket: 'rejected' as const, owner: null };
+  }
+
+  /*
+   * Поріг живості теж перевіряємо ТУТ, а не лише в cheapFilter.
+   *
+   * Той самий недогляд, що колись повернув церкви в Ліди: cheapFilter працює
+   * при вставці, а rescore/reviews/enrich кличуть decide() навпростець і
+   * воскрешають відсіяне. Так у Лідах опинились «Ukraine-Moldova American
+   * Enterprise Fund» (1 відгук) і «U.S.-Ukraine Business Council» (3) —
+   * некомерційні організації, яких не ловить excludeTypes, бо в Google вони
+   * позначені як звичайні компанії. Саме поріг відгуків їх і відсіює.
+   */
+  const ratings = i.place.userRatingCount ?? 0;
+  if (i.place.userRatingCount != null && ratings < i.preset.filters.minUserRatingCount) {
+    setBucket(
+      i.place.placeId,
+      'rejected',
+      `мало відгуків (${ratings} < ${i.preset.filters.minUserRatingCount})`,
+    );
     return { bucket: 'rejected' as const, owner: null };
   }
 

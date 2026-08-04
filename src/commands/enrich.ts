@@ -80,7 +80,10 @@ export async function enrich(opts: EnrichOpts) {
               const reviewRow = getReviewSignal(place.place_id);
 
               const verdict = decide({
-                place: { placeId: place.place_id, name: place.name, website: url },
+                place: {
+                  placeId: place.place_id, name: place.name, website: url,
+                  typesJson: place.types_json, userRatingCount: place.user_rating_count,
+                },
                 audit: siteAudit,
                 lang,
                 versionEvidence,

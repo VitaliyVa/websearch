@@ -36,12 +36,24 @@ export interface BriefInput {
    * без каталогу й форм» про сайт, який насправді адаптивний і робочий.
    */
   siteStatus?: 'ok' | 'dead' | 'blocked' | 'no_site';
+  /**
+   * Висновок ручного розбору, якщо лід переглянули очима.
+   *
+   * Автоматичні сигнали міряють справність сайту, а не його вік: сайт на
+   * Bootstrap 3 з jQuery 1.11 отримує 8/10, бо технічно все працює. Причина,
+   * з якої людина перевела його в Ліди, інакше ніде не видно — і продажник
+   * читав би «візуально відстав» без жодного пояснення, чим саме.
+   */
+  manualNote?: string | null;
 }
 
 const YEAR = new Date().getFullYear();
 
 export function buildBrief(i: BriefInput): string {
-  return [business(i), site(i), problems(i), hook(i)].filter(Boolean).join(' ');
+  const manual = i.manualNote?.startsWith('ручний розбір')
+    ? `Перевірено вручну: ${i.manualNote.replace(/^ручний розбір:\s*/, '')}.`
+    : '';
+  return [business(i), site(i), problems(i), manual, hook(i)].filter(Boolean).join(' ');
 }
 
 /** 1. Хто це і чи вартий дзвінка. */

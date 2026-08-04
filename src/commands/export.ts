@@ -264,6 +264,9 @@ function buildRow(p: PlaceRow): SheetRow {
     datedMarkers: quality.datedMarkers,
     difficultyLabel: diff?.label ?? null,
     siteStatus: quality.status,
+    // Колонка називається reject_reason історично, але setBucket пише в неї
+    // причину БУДЬ-ЯКОГО переміщення, зокрема й переведення в Ліди руками
+    manualNote: p.reject_reason ?? null,
   });
 
   const screenshotCell = p.website

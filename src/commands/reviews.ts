@@ -113,7 +113,10 @@ export async function reviews(opts: ReviewsOpts) {
       const quality = scoreSite(siteAudit, psi, !!place.website);
 
       const verdict = decide({
-        place: { placeId: place.place_id, name: place.name, website: place.website ?? '', typesJson: place.types_json },
+        place: {
+          placeId: place.place_id, name: place.name, website: place.website ?? '',
+          typesJson: place.types_json, userRatingCount: place.user_rating_count,
+        },
         audit: siteAudit,
         lang: siteLang,
         versionEvidence,
