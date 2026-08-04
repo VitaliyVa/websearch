@@ -22,14 +22,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Вмикає GitHub Pages програмно при першому прогоні — інакше довелося б
-      # спершу клікати Settings → Pages → Source: GitHub Actions вручну.
+      # actions/configure-pages свідомо НЕ використовується.
       #
-      # enablement обов'язковий: без нього крок лише ЧИТАЄ налаштування Pages
-      # і падає, якщо їх ще не існує. Саме на цьому впав перший прогін.
-      - uses: actions/configure-pages@v5
-        with:
-          enablement: true
+      # Він мав вмикати Pages програмно, але падає обома способами: без
+      # enablement лише читає налаштування й помиляється, коли їх немає, а з
+      # enablement упирається в права токена робочого процесу.
+      # Pages вмикаються один раз вручну: Settings → Pages → Source: GitHub Actions.
+      # Далі цей workflow працює сам.
 
       - uses: actions/setup-node@v4
         with:
