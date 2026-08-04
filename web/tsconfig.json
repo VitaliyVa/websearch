@@ -11,7 +11,10 @@
     "allowImportingTsExtensions": true,
     "isolatedModules": true,
     "resolveJsonModule": true,
-    "types": ["vite/client"]
+    // "node" потрібен для vite.config.ts, який читає process.env.
+    // Локально збірка проходила через типи кореневого проєкту, а в чистому
+    // клоні CI падала з "Cannot find name 'process'".
+    "types": ["vite/client", "node"]
   },
   "include": ["src", "vite.config.ts"]
 }
