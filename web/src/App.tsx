@@ -46,6 +46,12 @@ export default function App() {
   const [statusFilter, setStatusFilter] = useState('');
   const [sortKey, setSortKey] = useState('Оцінка сайту 1-10');
   const [saving, setSaving] = useState<string | null>(null);
+  /*
+   * Час останнього завантаження. На спільній панелі це не косметика:
+   * Apps Script кешує відповідь на 60 секунд, тож продажник може дивитись на
+   * дані, змінені колегою хвилину тому, і не розуміти цього.
+   */
+  const [loadedAt, setLoadedAt] = useState<Date | null>(null);
 
   const login = useCallback(async (c: string) => {
     setBusy(true);
@@ -54,6 +60,7 @@ export default function App() {
       const { user: u, data } = await fetchLeads(c);
       setUser(u);
       setPayload(data);
+      setLoadedAt(new Date());
       saveCode(c);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
@@ -286,8 +293,15 @@ export default function App() {
         </div>
       </Card>
 
-      <div style={{ margin: '12px 0', fontSize: 13, opacity: 0.7 }}>
-        Показано {filtered.length} з {rows.length}
+      <div style={{ ...row(8), margin: '12px 0', fontSize: 13, opacity: 0.7 }}>
+        <span>
+          Показано {filtered.length} з {rows.length}
+        </span>
+        {loadedAt && (
+          <span>
+            · дані на {loadedAt.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        )}
       </div>
 
       <div style={{ display: 'grid', gap: 12 }}>
