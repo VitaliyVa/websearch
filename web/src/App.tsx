@@ -66,6 +66,24 @@ function parsePsi(v: unknown): [number | null, number | null] {
 
 const countStars = (v: unknown) => (String(v ?? '').match(/★/g) ?? []).length;
 
+/**
+ * Дата контакту приходить або рядком, або серійним числом Google Sheets.
+ *
+ * Число з'являється, коли значення записав не Apps Script (він віддає Date і
+ * форматує сам), а, наприклад, наш експорт при перенесенні нотаток. Показувати
+ * продажнику «46238.543027673615» — гірше, ніж не показувати нічого.
+ */
+function formatSheetDate(v: unknown): string {
+  const s = String(v ?? '').trim();
+  if (!s) return '';
+  const n = Number(s);
+  // 25569 — днів між епохою Sheets (1899-12-30) і Unix
+  if (Number.isFinite(n) && n > 20_000 && n < 100_000) {
+    return new Date((n - 25569) * 86_400_000).toLocaleDateString('uk-UA');
+  }
+  return s;
+}
+
 /** Прибирає зірки з рядка складності, лишаючи словесний опис. */
 const difficultyLabel = (v: unknown) => String(v ?? '').replace(/[★☆]/g, '').trim();
 
@@ -164,6 +182,20 @@ export default function App() {
 
   const onStatusChange = useCallback(
     async (lead: Lead, status: string) => {
+      /*
+       * Запобіжник від запису, якого ніхто не робив.
+       *
+       * Selector, отримавши value, якого немає серед options, «виправляє» його
+       * і викликає onChange сам — просто на монтуванні. Одне відкриття панелі
+       * тихо відправляло update у таблицю: статус затирався, а Apps Script
+       * дописував поточну дату й ім'я. Виявилось при першому ж візуальному
+       * прогоні — рядок ліда виявився переписаним о 14:03, хоча ніхто нічого
+       * не натискав.
+       *
+       * Тому: зміна, що дорівнює поточному значенню, у мережу не йде.
+       */
+      if (status === String(lead['Статус'] ?? '')) return;
+
       setSaving(lead.place_id);
       // Оптимістично: продажник бачить зміну миттєво, а не через секунду очікування
       setPayload((prev) => {
@@ -431,11 +463,13 @@ function Kpi({
         >
           {icon}
         </span>
+        {/* display="block" обов'язковий: Text за замовчуванням inline,
+            і без нього число з підписом злипались у «64Усього» */}
         <div>
-          <Text type="display-3" as="div" weight="bold">
+          <Text type="display-3" as="div" display="block" weight="bold">
             {value}
           </Text>
-          <Text type="supporting" as="div">
+          <Text type="supporting" as="div" display="block">
             {label}
           </Text>
         </div>
@@ -474,6 +508,20 @@ function LeadCard({
   const scoreColor = score <= 3 ? '#059669' : score <= 6 ? '#d97706' : '#64748b';
 
   const status = String(lead['Статус'] ?? '');
+
+  /*
+   * Невідомий статус подаємо як варіант, а не даємо Selector'у його «виправити».
+   *
+   * Так у списку видно навіть сміття, що потрапило в колонку збоку (саме так
+   * виявився зсув колонок після міграції), і продажник розуміє, що там щось не
+   * те, замість того щоб бачити порожнє поле.
+   */
+  const statusOptions = [
+    { value: '', label: 'Не опрацьовано' },
+    ...statuses.map((s) => ({ value: s, label: s })),
+    ...(status && !statuses.includes(status) ? [{ value: status, label: `⚠ ${status}` }] : []),
+  ];
+
   const { rating, reviews } = parseRating(lead['Рейтинг / відгуки']);
   const [psiMobile, psiDesktop] = parsePsi(lead['PSI моб / деск']);
   const stars = countStars(lead['Складність розробки']);
@@ -593,15 +641,13 @@ function LeadCard({
               value={status}
               onChange={onStatus}
               isDisabled={saving}
-              options={[
-                { value: '', label: 'Не опрацьовано' },
-                ...statuses.map((s) => ({ value: s, label: s })),
-              ]}
+              options={statusOptions}
             />
             {lead['Хто веде'] && (
-              <Text type="supporting" as="div">
+              <Text type="supporting" as="div" display="block">
                 веде: <strong>{String(lead['Хто веде'])}</strong>
-                {lead['Дата контакту'] ? ` · ${String(lead['Дата контакту'])}` : ''}
+                {formatSheetDate(lead['Дата контакту']) &&
+                  ` · ${formatSheetDate(lead['Дата контакту'])}`}
               </Text>
             )}
 

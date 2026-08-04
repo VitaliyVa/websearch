@@ -15,3 +15,8 @@ web/node_modules/
 web/dist/
 web/.env
 web/*.tsbuildinfo
+
+# артефакти візуальної перевірки (тільки в корені — скріни лідів лежать
+# у web/public/shots і мусять потрапляти в збірку)
+.playwright-mcp/
+/*.png

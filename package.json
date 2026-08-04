@@ -21,7 +21,11 @@
     "test:signals": "node --no-warnings=ExperimentalWarning --import tsx scripts/test-signals.ts",
     "test:names": "node --no-warnings=ExperimentalWarning --import tsx scripts/test-names.ts",
     "test": "npm run test:signals && npm run test:names",
-    "names:fetch": "node --no-warnings=ExperimentalWarning --import tsx scripts/fetch-names.mjs"
+    "names:fetch": "node --no-warnings=ExperimentalWarning --import tsx scripts/fetch-names.mjs",
+    "shots": "node --no-warnings=ExperimentalWarning --import tsx scripts/sync-shots.ts",
+    "brief:preview": "node --no-warnings=ExperimentalWarning --import tsx scripts/preview-brief.ts",
+    "sheet:verify": "node --no-warnings=ExperimentalWarning --import tsx scripts/verify-sheet.ts",
+    "sheet:migrate": "node --no-warnings=ExperimentalWarning --import tsx scripts/migrate-columns.ts"
   },
   "dependencies": {
     "cheerio": "^1.1.2",
