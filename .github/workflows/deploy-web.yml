@@ -24,7 +24,12 @@ jobs:
 
       # Вмикає GitHub Pages програмно при першому прогоні — інакше довелося б
       # спершу клікати Settings → Pages → Source: GitHub Actions вручну.
+      #
+      # enablement обов'язковий: без нього крок лише ЧИТАЄ налаштування Pages
+      # і падає, якщо їх ще не існує. Саме на цьому впав перший прогін.
       - uses: actions/configure-pages@v5
+        with:
+          enablement: true
 
       - uses: actions/setup-node@v4
         with:
