@@ -65,6 +65,8 @@ function tabKey(title) {
   var map = {
     'Leads': 'leads',
     'Ліди без сайту': 'noSiteLeads',
+    'З хорошим сайтом': 'upsell',
+    'Свої з сайтом': 'upsell',
     'Manual review': 'manual',
     'NO_SITE': 'noSite',
     'Rejected': 'rejected',

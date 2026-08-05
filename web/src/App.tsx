@@ -36,7 +36,7 @@ import {
 const TAB_LABEL: Record<string, string> = {
   leads: 'Ліди',
   noSiteLeads: 'Ліди без сайту',
-  upsell: 'Свої з сайтом',
+  upsell: 'З хорошим сайтом',
   manual: 'Ручна перевірка',
   noSite: 'Без сайту',
   rejected: 'Відхилені',
