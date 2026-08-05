@@ -44,6 +44,7 @@ export async function exportSheets(opts: ExportOpts) {
      * впевнено ми знаємо, що власник свій.
      */
     { key: 'noSiteLeads', where: "WHERE bucket = 'no_site_lead'" },
+    { key: 'upsell', where: "WHERE bucket = 'upsell'" },
     { key: 'manual', where: "WHERE bucket IN ('manual','pending')" },
     { key: 'noSite', where: "WHERE bucket = 'no_site'" },
   ];
@@ -60,7 +61,7 @@ export async function exportSheets(opts: ExportOpts) {
     // Сортування різне за змістом: де є сайт — найгірший угорі, бо це найкращий
     // лід; де сайту немає — угорі найвпевненіший мовний сигнал
     const order =
-      b.key === 'noSiteLeads'
+      b.key === 'noSiteLeads' || b.key === 'upsell'
         ? `COALESCE((SELECT score FROM owner_scores os WHERE os.place_id = places.place_id), 0) DESC,
            COALESCE(user_rating_count, 0) DESC`
         : `COALESCE((SELECT site_score FROM site_audits sa WHERE sa.place_id = places.place_id), 5) ASC,

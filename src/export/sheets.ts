@@ -279,7 +279,7 @@ export async function collectHumanNotes(
 
   // Meta — службова вкладка на 2 колонки, лідів там немає.
   // Без цього фільтра loadCells падає з "Out of bounds, sheet is 23 by 2".
-  const leadTabs = [TABS.leads, TABS.noSiteLeads, TABS.manual, TABS.noSite, TABS.rejected];
+  const leadTabs = [TABS.leads, TABS.noSiteLeads, TABS.upsell, TABS.manual, TABS.noSite, TABS.rejected];
 
   for (const title of leadTabs) {
     const sheet = doc.sheetsByTitle[title];

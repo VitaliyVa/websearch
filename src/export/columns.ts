@@ -57,6 +57,12 @@ export const ALL_COLUMNS = [...MACHINE_COLUMNS, ...HUMAN_COLUMNS];
 export const TABS = {
   leads: 'Leads',
   noSiteLeads: 'Ліди без сайту',
+  /*
+   * Мова підтверджена, але сайт сучасний — переробляти нема чого.
+   * Раніше такі просто відсіювались, і це була помилка: власник свій,
+   * бізнес живий, просто оффер інший — SEO, реклама, підтримка, доробки.
+   */
+  upsell: 'Свої з сайтом',
   manual: 'Manual review',
   noSite: 'NO_SITE',
   rejected: 'Rejected',
