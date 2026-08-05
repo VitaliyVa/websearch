@@ -46,6 +46,21 @@ function migrate(d: DatabaseSync) {
   if (!rev.has('author_cyrillic')) {
     d.exec('ALTER TABLE review_signals ADD COLUMN author_cyrillic INTEGER NOT NULL DEFAULT 0');
   }
+
+  /*
+   * Рішення, ухвалене людиною, має пережити будь-яку переоцінку.
+   *
+   * Без цього ручний розбір безглуздий: із 28 рішень після перегляду 47
+   * кандидатів наступний `rescore` скасував 26, і Joong Boo Market —
+   * корейський супермаркет, відхилений після перевірки — повернувся в чергу
+   * як «мовно підтверджений». Автоматика не знає того, що знає людина.
+   */
+  const pl = columns('places');
+  if (!pl.has('manual_verdict')) {
+    d.exec('ALTER TABLE places ADD COLUMN manual_verdict TEXT');
+    d.exec('ALTER TABLE places ADD COLUMN manual_verdict_reason TEXT');
+    d.exec('ALTER TABLE places ADD COLUMN manual_verdict_at TEXT');
+  }
 }
 
 const now = () => new Date().toISOString();
@@ -113,6 +128,10 @@ export interface PlaceRow {
   stage: string;
   bucket: string;
   reject_reason: string | null;
+  /** Вердикт людини; якщо заданий, decide() автоматику не застосовує */
+  manual_verdict: string | null;
+  manual_verdict_reason: string | null;
+  manual_verdict_at: string | null;
 }
 
 export function setStage(placeId: string, stage: string) {
@@ -123,6 +142,25 @@ export function setStage(placeId: string, stage: string) {
 export function setBucket(placeId: string, bucket: string, reason: string | null = null) {
   db().prepare('UPDATE places SET bucket = ?, reject_reason = ?, updated_at = ? WHERE place_id = ?')
     .run(bucket, reason, now(), placeId);
+}
+
+/**
+ * Вердикт людини. Перекриває автоматику назавжди, поки його не знімуть.
+ *
+ * Пишеться в окремі колонки, а не в `bucket`: `bucket` перераховується
+ * щоразу, і саме тому ручні рішення й губились.
+ */
+export function setManualVerdict(placeId: string, bucket: string, reason: string) {
+  db().prepare(
+    `UPDATE places SET manual_verdict = ?, manual_verdict_reason = ?, manual_verdict_at = ?,
+       bucket = ?, reject_reason = ?, updated_at = ? WHERE place_id = ?`,
+  ).run(bucket, reason, now(), bucket, reason, now(), placeId);
+}
+
+export function clearManualVerdict(placeId: string) {
+  db().prepare(
+    'UPDATE places SET manual_verdict = NULL, manual_verdict_reason = NULL, manual_verdict_at = NULL WHERE place_id = ?',
+  ).run(placeId);
 }
 
 export function getPlaces(where: string, params: unknown[] = []): PlaceRow[] {

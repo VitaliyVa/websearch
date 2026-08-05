@@ -13,7 +13,7 @@
  *
  * Запуск без --apply лише друкує, що станеться.
  */
-import { getPlaces, setBucket } from '../src/db/index.js';
+import { getPlaces, setManualVerdict } from '../src/db/index.js';
 import { log } from '../src/util/log.js';
 
 const APPLY = process.argv.includes('--apply');
@@ -138,13 +138,20 @@ for (const m of MOVES) {
   }
 
   const p = found[0]!;
-  if (p.bucket === m.to) {
-    log.dim(`${p.name.slice(0, 40)} вже в ${m.to}`);
+  /*
+   * Вердикт ставимо навіть якщо бакет уже правильний.
+   *
+   * Раніше тут стояв `continue` — і саме через це рішення не закріплювались:
+   * запис уже лежав де треба, скрипт його пропускав, а наступний `rescore`
+   * спокійно переносив назад, бо жодної позначки «це вирішила людина» не було.
+   */
+  if (p.bucket === m.to && p.manual_verdict === m.to) {
+    log.dim(`${p.name.slice(0, 40)} вже закріплено`);
     continue;
   }
 
   console.log(`  ${p.bucket} → ${m.to.padEnd(8)} ${p.name.slice(0, 46)}`);
-  if (APPLY) setBucket(p.place_id, m.to, m.why);
+  if (APPLY) setManualVerdict(p.place_id, m.to, m.why);
   moved++;
 }
 

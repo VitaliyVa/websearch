@@ -42,7 +42,52 @@ export function rescore(presetName: string, limit: number | null) {
     const row = getAudit(place.place_id);
 
     if (!cached || !row) {
+      /*
+       * Без кешу сайт перечитати неможливо — але НАЗВА бізнесу від кешу не
+       * залежить, і саме її оцінює nameSignal. Раніше такі записи просто
+       * пропускались, тож розширення лексикону їх не діставало: «Varenyk
+       * House» (287 відгуків), «Beryozka European Market» (277) і
+       * «Meest-Karpaty» (156) лишались із нулем, хоча детектор їх упізнає.
+       *
+       * Сайтових даних не вигадуємо — передаємо ті, що вже збережені (або
+       * порожні), і даємо decide() перерахувати вердикт із новим іменем.
+       */
       missing++;
+      const audit: SiteAudit | null = row ? JSON.parse(row.audit_json) : null;
+      const psiRow = getPsi(place.place_id);
+      const psi = psiRow
+        ? {
+            mobileScore: psiRow.mobile_score, desktopScore: psiRow.desktop_score,
+            lcpMs: psiRow.lcp_ms, cls: psiRow.cls, fetchedAt: psiRow.fetched_at,
+          }
+        : null;
+      const quality = scoreSite(audit, psi, !!place.website);
+      const reviewRow = getReviewSignal(place.place_id);
+
+      const verdict = decide({
+        place: {
+          placeId: place.place_id, name: place.name, website: place.website!,
+          typesJson: place.types_json, userRatingCount: place.user_rating_count,
+          manualVerdict: place.manual_verdict, manualVerdictReason: place.manual_verdict_reason,
+        },
+        audit,
+        lang: row?.lang_json ? JSON.parse(row.lang_json) : null,
+        versionEvidence: row?.version_evidence_json ? JSON.parse(row.version_evidence_json) : [],
+        siteScore10: row?.site_score ?? quality.score10,
+        siteStatus: quality.status,
+        datedMarkers: quality.datedMarkers,
+        psiDone: !!psiRow,
+        reviews: reviewRow ? toReviewSignal(reviewRow) : null,
+        preset,
+      });
+
+      if (verdict.bucket !== place.bucket) {
+        if (verdict.bucket === 'leads') moved.toLeads++;
+        else if (verdict.bucket === 'manual') moved.toManual++;
+        else if (verdict.bucket === 'rejected') moved.toRejected++;
+        else moved.toPending++;
+      }
+
       progress('rescore', ++done, places.length);
       continue;
     }
@@ -104,6 +149,7 @@ export function rescore(presetName: string, limit: number | null) {
       place: {
         placeId: place.place_id, name: place.name, website: place.website!,
         typesJson: place.types_json, userRatingCount: place.user_rating_count,
+          manualVerdict: place.manual_verdict, manualVerdictReason: place.manual_verdict_reason,
       },
       audit,
       lang,

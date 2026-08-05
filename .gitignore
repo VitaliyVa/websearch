@@ -20,3 +20,6 @@ web/*.tsbuildinfo
 # у web/public/shots і мусять потрапляти в збірку)
 .playwright-mcp/
 /*.png
+
+# профіль справжнього Chrome для обходу челенджів
+.chrome-profile/

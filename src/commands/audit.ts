@@ -78,7 +78,11 @@ export async function audit(opts: AuditOpts) {
           if (quality.status === 'dead') stats.dead++;
 
           const verdict = decide({
-            place: { placeId: place.place_id, name: place.name, website: place.website!, typesJson: place.types_json, userRatingCount: place.user_rating_count },
+            place: {
+              placeId: place.place_id, name: place.name, website: place.website!,
+              typesJson: place.types_json, userRatingCount: place.user_rating_count,
+              manualVerdict: place.manual_verdict, manualVerdictReason: place.manual_verdict_reason,
+            },
             audit: outcome.audit,
             lang: outcome.lang,
             versionEvidence,
@@ -129,6 +133,9 @@ export interface DecideInput {
     typesJson?: string | null;
     /** Потрібен, щоб переоцінка не воскрешала бізнеси, відсіяні за живістю */
     userRatingCount?: number | null;
+    /** Вердикт людини. Якщо заданий — автоматика мовчить. */
+    manualVerdict?: string | null;
+    manualVerdictReason?: string | null;
   };
   audit: SiteAudit | null;
   lang: LangSignal | null;
@@ -160,6 +167,20 @@ export interface DecideInput {
  * потрібна — асимільованого бізнесу з англомовним сайтом.
  */
 export function decide(i: DecideInput) {
+  /*
+   * Вердикт людини — понад усе.
+   *
+   * Автоматика не знає того, що знає людина: що Joong Boo Market корейський,
+   * а робоча версія `?lang=ru` означає лише обслуговування російськомовних.
+   * Раніше цієї перевірки не було, і `rescore` скасував 26 із 28 рішень
+   * ручного розбору — сама процедура перегляду ставала безглуздою.
+   *
+   * Знімається через clearManualVerdict().
+   */
+  if (i.place.manualVerdict) {
+    return { bucket: i.place.manualVerdict as 'leads', owner: null };
+  }
+
   /*
    * Виключення за типом закладу перевіряємо ТУТ, а не лише в cheapFilter.
    *

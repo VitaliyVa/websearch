@@ -10,7 +10,7 @@
  *
  * Без --apply нічого не пише.
  */
-import { getPlaces, getOwnerScore, setBucket } from '../src/db/index.js';
+import { getPlaces, getOwnerScore, setManualVerdict } from '../src/db/index.js';
 import { log } from '../src/util/log.js';
 
 const APPLY = process.argv.includes('--apply');
@@ -35,13 +35,13 @@ for (const p of getPlaces("WHERE bucket = 'no_site'")) {
 
   if (NOT_A_BUSINESS.some((n) => p.name.trim().toLowerCase().startsWith(n.toLowerCase()))) {
     console.log(`  пропуск (не бізнес): ${p.name}`);
-    if (APPLY) setBucket(p.place_id, 'rejected', 'організація або топонім, не комерційний бізнес');
+    if (APPLY) setManualVerdict(p.place_id, 'rejected', 'організація або топонім, не комерційний бізнес');
     skipped++;
     continue;
   }
 
   console.log(`  ${String(score).padStart(2)} · ${String(p.user_rating_count ?? 0).padStart(4)} відг · ${p.name.slice(0, 46)}`);
-  if (APPLY) setBucket(p.place_id, 'no_site_lead', `мова підтверджена за назвою (скор ${score})`);
+  if (APPLY) setManualVerdict(p.place_id, 'no_site_lead', `мова підтверджена за назвою (скор ${score})`);
   promoted++;
 }
 

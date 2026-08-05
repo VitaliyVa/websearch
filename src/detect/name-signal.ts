@@ -64,7 +64,15 @@ const BRAND_MARKERS: { re: RegExp; weight: number; label: string }[] = [
    * Вага помірна: під «European» іноді ховається італійська чи грецька
    * гастрономія, тому сам по собі маркер ліда не робить.
    */
-  { re: /\b(eastern\s+european|europ\w*\s+(market|deli|food|bakery|grocer|kitchen)|euro\s?(market|deli|food|mix))\b/i,
+  /*
+   * Кінцевої межі \b тут БУТИ НЕ ПОВИННО.
+   *
+   * З нею «European Delicatessen» (1178 відгуків) не збігався: після «Deli»
+   * іде «c», тобто теж літера, і \b не спрацьовував. Слова навмисно
+   * зіставляються за префіксом — deli/delicatessen, grocer/grocery,
+   * bakery/bakehouse.
+   */
+  { re: /\b(eastern\s+european|europ\w*\s*(market|deli|food|bakery|grocer|kitchen)|euro\s?(market|deli|food|mix|fresh))/i,
     weight: 22, label: 'європейська гастрономія' },
 
   /*
@@ -77,6 +85,18 @@ const BRAND_MARKERS: { re: RegExp; weight: number; label: string }[] = [
     weight: 28, label: 'слов. бренд' },
   { re: /\b(hetman|kozak|kazak|cossack|chumak|bandura|trembita|karpaty|dnister|str[ei]{1,2}cha|zustrich|kolyba|vatra|khata|puzata|smak)\b/i,
     weight: 28, label: 'укр культурний маркер' },
+
+  /*
+   * Meest — українська служба посилок. Її згадують точки видачі та
+   * пункти прийому: «Postman Joe 11235 (… MEEST …)», «Meest-Karpaty».
+   * Бізнес, що працює з Meest, обслуговує саме українську діаспору —
+   * американцю така послуга не потрібна взагалі.
+   */
+  { re: /\bmeest\b/i, weight: 30, label: 'Meest — українська посилкова служба' },
+
+  /* Культурні імена, які використовують як вивіску */
+  { re: /\b(zhivago|vanka|katyusha|kalinka|sputnik|dacha|izba|tro[iy]ka)\b/i,
+    weight: 26, label: 'рос культурна вивіска' },
   { re: /\b(pyrohy|varenyk\w*|vareniki|borscht|borsch|pelmeni|shashlik|blini|blintz|syrniki|golubtsi|kholodets|kvas|halva|zefir|pastila)\b/i,
     weight: 24, label: 'страва' },
 
@@ -95,7 +115,7 @@ const BRAND_MARKERS: { re: RegExp; weight: number; label: string }[] = [
    * грузинською кухнею веде справи російською і сайт замовлятиме російською.
    * Вага нижча, а мітка явна, щоб продажник бачив, з ким має справу.
    */
-  { re: /\b(tashkent|uzbek\w*|samarqand|samarkand|bukhara|chayhana|chaikhana|chayxona|ustaxona|lagman|somsa|plov)\b/i,
+  { re: /\b(tashkent|toshkent|uzbek\w*|samarqand|samarkand|bukhara|chayhana|chaikhana|chayxona|ustaxona|tandir|lagman|somsa|plov)\b/i,
     weight: 16, label: 'Центральна Азія (російськомовні)' },
   { re: /\b(georgian|sakartvelo|genatsvale|khachapuri|khinkali|mtskheta|tbilisi|berikoni|oda\s+house|supra)\b/i,
     weight: 14, label: 'Грузія (російськомовні)' },
@@ -112,7 +132,8 @@ const EXCLUDE = [
    * більша за українську, тож ціна помилки тут висока.
    */
   { re: /\b(polish|poland|polska|polski|sklep|paczki|pączki|przychodnia|lajkonik|podkarpacie|piekarnia|kielbasa|zakopane|krakow|warszawa)\b/i, label: 'polish' },
-  { re: /\b(serbian|croatian|bosnian|balkan|cevapi|prodavnica|kulinarija|beograd|srpsk\w*)\b/i, label: 'balkan' },
+  { re: /\b(serbian|croatian|bosnian|balkan|cevapi|prodavnica|kulinarija|beograd|srpsk\w*|kafana)\b/i, label: 'balkan' },
+  { re: /\b(lithuanian|latvian|estonian|vilnius|riga|tallinn|lietuv\w*)\b/i, label: 'baltic' },
   { re: /\b(bulgarian|bulgaria|banitsa)\b/i, label: 'bulgarian' },
   { re: /\b(czech|slovak|prague|praha)\b/i, label: 'czech' },
   { re: /\b(romanian|romania|mamaliga|bucuresti)\b/i, label: 'romanian' },
