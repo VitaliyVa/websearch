@@ -45,14 +45,38 @@ const TAB_LABEL: Record<string, string> = {
 /** Пояснення при наведенні — назва вкладки коротка, а зміст не завжди очевидний. */
 const TAB_HINT: Record<string, string> = {
   leads: 'Власник україно- або російськомовний, сайт застарілий або не працює. Оффер — новий сайт.',
-  noSiteLeads: 'Власник свій, але сайту немає взагалі — тільки картка в Google Maps. Оффер — зробити перший сайт.',
+  noSiteLeads:
+    'Власник україно- або російськомовний, але сайту немає взагалі — тільки картка ' +
+    'в Google Maps. Оффер — зробити перший сайт.',
   upsell:
     'Власник україно- або російськомовний, але сайт сучасний — переробляти нема чого. ' +
     'Заходити з інших послуг: SEO, реклама, підтримка, доробки, аналітика.',
   manual: 'Сигналу не вистачило для рішення. Потрібне око людини.',
-  noSite: 'Сайту немає, але мову власника не підтверджено. Перевір перед дзвінком.',
+  noSite: 'Сайту немає, але мову власника НЕ підтверджено. Перевір перед дзвінком.',
   rejected: 'Відсіяні з причиною. Нічого не видалено — можна повернути.',
 };
+
+/**
+ * Вкладки, де мова власника вже підтверджена доказами.
+ *
+ * Позначка потрібна саме тут: «Ліди без сайту» і «Без сайту» відрізняються
+ * одним словом, а означають протилежне — у перших мова доведена, у других ні.
+ * Без мітки продажник дзвонить не тим.
+ */
+const LANG_CONFIRMED = new Set(['leads', 'noSiteLeads', 'upsell']);
+
+/**
+ * Звіряємо і за ключем, і за назвою.
+ *
+ * Ключ дає Apps Script, і для невідомої йому вкладки він повертає автоматичний
+ * слаг. Поки скрипт у редакторі не оновили, «З хорошим сайтом» приходить саме
+ * так — і мітка на цій вкладці просто не з'явилась би. Назва ж приходить
+ * завжди.
+ */
+const LANG_CONFIRMED_TITLES = new Set(['Leads', 'Ліди без сайту', 'З хорошим сайтом', 'Свої з сайтом']);
+
+const isLangConfirmed = (key: string, title: string) =>
+  LANG_CONFIRMED.has(key) || LANG_CONFIRMED_TITLES.has(title);
 
 /* Скріншоти лежать у самій збірці — Apps Script їх не віддає і не мусить. */
 const shotUrl = (placeId: string, kind: 'mobile' | 'desktop') =>
@@ -338,14 +362,39 @@ export default function App() {
 
       <div style={{ ...row(8), marginTop: 20 }}>
         {tabs.map((t) => (
-          <Button
-            key={t.key}
-            label={`${TAB_LABEL[t.key] ?? t.title} (${t.rows.length})`}
-            size="md"
-            variant={tab === t.key ? 'primary' : 'secondary'}
-            tooltip={TAB_HINT[t.key]}
-            onClick={() => setTab(t.key)}
-          />
+          /* position: relative — щоб мітка «ukr/ru» сіла в правий верхній кут кнопки */
+          <span key={t.key} style={{ position: 'relative', display: 'inline-flex' }}>
+            <Button
+              label={`${TAB_LABEL[t.key] ?? t.title} (${t.rows.length})`}
+              size="md"
+              variant={tab === t.key ? 'primary' : 'secondary'}
+              tooltip={TAB_HINT[t.key]}
+              onClick={() => setTab(t.key)}
+            />
+            {isLangConfirmed(t.key, t.title) && (
+              <span
+                aria-hidden="true"
+                style={{
+                  position: 'absolute',
+                  top: -7,
+                  right: -8,
+                  background: '#059669',
+                  color: '#fff',
+                  fontSize: 10,
+                  fontWeight: 700,
+                  lineHeight: 1,
+                  letterSpacing: '0.02em',
+                  padding: '3px 6px',
+                  borderRadius: 999,
+                  border: '2px solid var(--color-background-body)',
+                  pointerEvents: 'none',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                ukr/ru
+              </span>
+            )}
+          </span>
         ))}
         <Button
           label={busy ? 'Оновлюю…' : 'Оновити'}
