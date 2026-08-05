@@ -28,12 +28,17 @@ import {
   Stars, Tag, Target, Users,
 } from './icons';
 
-type TabKey = 'leads' | 'manual' | 'noSite';
-
-const TAB_LABEL: Record<TabKey, string> = {
+/**
+ * Назви вкладок у таблиці технічні («Leads», «NO_SITE»), а продажнику потрібні
+ * людські. Невідомий ключ показуємо як є — краще технічна назва, ніж порожня
+ * кнопка, якщо в пайплайні з'явиться ще одна вкладка.
+ */
+const TAB_LABEL: Record<string, string> = {
   leads: 'Ліди',
+  noSiteLeads: 'Ліди без сайту',
   manual: 'Ручна перевірка',
   noSite: 'Без сайту',
+  rejected: 'Відхилені',
 };
 
 /* Скріншоти лежать у самій збірці — Apps Script їх не віддає і не мусить. */
@@ -96,7 +101,7 @@ export default function App() {
   const [payload, setPayload] = useState<Payload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [tab, setTab] = useState<TabKey>('leads');
+  const [tab, setTab] = useState<string>('leads');
   const [search, setSearch] = useState('');
   const [cityFilter, setCityFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
@@ -141,7 +146,12 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [zoom]);
 
-  const rows = useMemo(() => (payload ? payload[tab] : []), [payload, tab]);
+  const tabs = payload?.tabs ?? [];
+  // Якщо активної вкладки більше немає (спорожніла), падаємо на першу наявну
+  const rows = useMemo(
+    () => tabs.find((t) => t.key === tab)?.rows ?? tabs[0]?.rows ?? [],
+    [tabs, tab],
+  );
 
   const cities = useMemo(
     () => countBy(rows, (r) => String(r['Місто / район'] ?? '')).map(([c]) => c),
@@ -201,14 +211,25 @@ export default function App() {
 
       setSaving(lead.place_id);
       // Оптимістично: продажник бачить зміну миттєво, а не через секунду очікування
-      setPayload((prev) => {
-        if (!prev) return prev;
-        const next = { ...prev };
-        next[tab] = next[tab].map((r) =>
-          r.place_id === lead.place_id ? { ...r, Статус: status, 'Хто веде': user ?? '' } : r,
-        );
-        return next;
-      });
+      setPayload((prev) =>
+        prev
+          ? {
+              ...prev,
+              tabs: prev.tabs.map((t) =>
+                t.key !== tab
+                  ? t
+                  : {
+                      ...t,
+                      rows: t.rows.map((r) =>
+                        r.place_id === lead.place_id
+                          ? { ...r, Статус: status, 'Хто веде': user ?? '' }
+                          : r,
+                      ),
+                    },
+              ),
+            }
+          : prev,
+      );
       try {
         await updateLead(code, lead.place_id, { status });
       } catch (e) {
@@ -303,13 +324,13 @@ export default function App() {
       )}
 
       <div style={{ ...row(8), marginTop: 20 }}>
-        {(Object.keys(TAB_LABEL) as TabKey[]).map((k) => (
+        {tabs.map((t) => (
           <Button
-            key={k}
-            label={`${TAB_LABEL[k]} (${payload?.[k].length ?? 0})`}
+            key={t.key}
+            label={`${TAB_LABEL[t.key] ?? t.title} (${t.rows.length})`}
             size="md"
-            variant={tab === k ? 'primary' : 'secondary'}
-            onClick={() => setTab(k)}
+            variant={tab === t.key ? 'primary' : 'secondary'}
+            onClick={() => setTab(t.key)}
           />
         ))}
         <Button

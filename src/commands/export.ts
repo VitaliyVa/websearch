@@ -38,6 +38,12 @@ export async function exportSheets(opts: ExportOpts) {
 
   const buckets: { key: TabKey; where: string }[] = [
     { key: 'leads', where: "WHERE bucket = 'leads'" },
+    /*
+     * Ліди без сайту сортуємо за мовним скором, а не за оцінкою сайту:
+     * сайту в них немає, тож єдине, що впорядковує список, — наскільки
+     * впевнено ми знаємо, що власник свій.
+     */
+    { key: 'noSiteLeads', where: "WHERE bucket = 'no_site_lead'" },
     { key: 'manual', where: "WHERE bucket IN ('manual','pending')" },
     { key: 'noSite', where: "WHERE bucket = 'no_site'" },
   ];
@@ -51,12 +57,16 @@ export async function exportSheets(opts: ExportOpts) {
   // Спершу збираємо, хто де МАЄ бути зараз
   const target = new Map<string, { key: TabKey; places: PlaceRow[] }>();
   for (const b of buckets) {
-    const places = getPlaces(
-      `${b.where} ORDER BY
-        COALESCE((SELECT site_score FROM site_audits sa WHERE sa.place_id = places.place_id), 5) ASC,
-        COALESCE(user_rating_count, 0) DESC`,
-    );
-    target.set(TABS[b.key], { key: b.key, places });
+    // Сортування різне за змістом: де є сайт — найгірший угорі, бо це найкращий
+    // лід; де сайту немає — угорі найвпевненіший мовний сигнал
+    const order =
+      b.key === 'noSiteLeads'
+        ? `COALESCE((SELECT score FROM owner_scores os WHERE os.place_id = places.place_id), 0) DESC,
+           COALESCE(user_rating_count, 0) DESC`
+        : `COALESCE((SELECT site_score FROM site_audits sa WHERE sa.place_id = places.place_id), 5) ASC,
+           COALESCE(user_rating_count, 0) DESC`;
+
+    target.set(TABS[b.key], { key: b.key, places: getPlaces(`${b.where} ORDER BY ${order}`) });
   }
 
   const placeTab = new Map<string, string>();

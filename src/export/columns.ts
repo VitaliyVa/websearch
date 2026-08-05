@@ -47,8 +47,16 @@ export const HUMAN_COLUMNS = [
 export const MACHINE_COL_COUNT = MACHINE_COLUMNS.length; // 23 → A..W
 export const ALL_COLUMNS = [...MACHINE_COLUMNS, ...HUMAN_COLUMNS];
 
+/**
+ * Порядок ключів = порядок вкладок у таблиці.
+ *
+ * «Ліди без сайту» стоять одразу після «Leads» навмисно: це теж готові до
+ * дзвінка ліди, просто з іншим оффером — не переробити сайт, а зробити перший.
+ * Решта NO_SITE лишається окремо як неперевірена маса.
+ */
 export const TABS = {
   leads: 'Leads',
+  noSiteLeads: 'Ліди без сайту',
   manual: 'Manual review',
   noSite: 'NO_SITE',
   rejected: 'Rejected',

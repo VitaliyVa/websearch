@@ -30,27 +30,99 @@ const SURNAME_PATTERNS: { re: RegExp; weight: number; label: string }[] = [
 /** Закінчення, характерні саме для польських прізвищ. */
 const POLISH_SURNAME_RE = /\b\w{3,}(owski|ewski|inski|ynski|owicz|ewicz|czyk|czak|kowska|owska)\b/i;
 
-/** Явні етнічні маркери в назві бізнесу. */
+/**
+ * Кирилиця прямо в назві — найсильніший можливий сигнал.
+ *
+ * Google віддає назву так, як її зареєстрував власник. Якщо там кирилиця
+ * («NE VKUSNO И TOCHKA», «Посилки В Україну»), сумніватись нема в чому.
+ * Виняток — сербські гліфи, їх ловить окреме виключення нижче.
+ */
+const CYRILLIC_RE = /[Ѐ-ӿ]/;
+
+/**
+ * Явні етнічні маркери в назві бізнесу.
+ *
+ * Лексикон побудований з реальних назв у базі, а не з уяви. Головна знахідка:
+ * діаспорні бізнеси в США масово беруть за назву звичайне побутове слово в
+ * транслітерації — Stolovaya, Skovorodka, Gastronom, Selo. Носій англійської
+ * так свій бізнес не назве, тому сигнал дуже чистий.
+ */
 const BRAND_MARKERS: { re: RegExp; weight: number; label: string }[] = [
   { re: /\b(ukrain\w*|ukr)\b/i,                       weight: 30, label: 'ukrainian' },
   { re: /\b(russian|russia)\b/i,                      weight: 26, label: 'russian' },
   { re: /\bslavic\b/i,                                weight: 26, label: 'slavic' },
-  { re: /\b(kyiv|kiev|odessa|odesa|lviv|kharkiv|dnipro)\b/i, weight: 28, label: 'укр місто в назві' },
-  { re: /\b(moscow|siberia|volga|baikal)\b/i,         weight: 20, label: 'рос топонім' },
-  { re: /\b(eastern european|euro\s?market|euro\s?deli|euro\s?food)\b/i, weight: 22, label: 'euro market' },
-  { re: /\b(kalyna|veselka|troyanda|smachno|nasha|nashe|privet|babushka|matryoshka|samovar|kalinka|berezka)\b/i,
-    weight: 26, label: 'слов. бренд' },
-  { re: /\b(pyrohy|pierogi|varenyky|borscht|borsch|pelmeni|shashlik|blini)\b/i, weight: 24, label: 'страва' },
-  { re: /\b(baltic|belarus|moldova|caucasus)\b/i,     weight: 14, label: 'сусідній регіон' },
+  { re: /\b(kyiv|kiev|odessa|odesa|lviv|kharkiv|dnipro|poltava|vinnytsia|chernivtsi)\b/i,
+    weight: 28, label: 'укр місто в назві' },
+  { re: /\b(moscow|moskow|siberia|volga|baikal|samara|sochi|rostov)\b/i, weight: 20, label: 'рос топонім' },
+
+  /*
+   * «European deli/market» — стандартне брендування слов'янських продуктових
+   * у США. Раніше правило вимагало буквального «euro market», тож повз нього
+   * проходили Stefania's European Food Market (243 відгуки), Selo European
+   * Deli (177), Berëzka European Market (156) — по базі таких 58.
+   *
+   * Вага помірна: під «European» іноді ховається італійська чи грецька
+   * гастрономія, тому сам по собі маркер ліда не робить.
+   */
+  { re: /\b(eastern\s+european|europ\w*\s+(market|deli|food|bakery|grocer|kitchen)|euro\s?(market|deli|food|mix))\b/i,
+    weight: 22, label: 'європейська гастрономія' },
+
+  /*
+   * Побутові слова в транслітерації. Найцінніша група — англомовний власник
+   * такого не вигадає.
+   */
+  { re: /\b(stolovaya|stolovaia|skovorodka|gastronom|produkty|magazin|traktir|kulinaria)\b/i,
+    weight: 30, label: 'побутове слово (їдальня/гастроном)' },
+  { re: /\b(ber[eyëij]{1,2}[oz]?zka|beriozka|berjozka|kalyna|kalinka|veselka|troyanda|smachno|privet|babushka|matr[ye]shka|matryoshka|samovar|selo|sadko|troika|teremok|kolos|landish|ryabina|zhuravli|vasilki|vasylky)\b/i,
+    weight: 28, label: 'слов. бренд' },
+  { re: /\b(hetman|kozak|kazak|cossack|chumak|bandura|trembita|karpaty|dnister|str[ei]{1,2}cha|zustrich|kolyba|vatra|khata|puzata|smak)\b/i,
+    weight: 28, label: 'укр культурний маркер' },
+  { re: /\b(pyrohy|varenyk\w*|vareniki|borscht|borsch|pelmeni|shashlik|blini|blintz|syrniki|golubtsi|kholodets|kvas|halva|zefir|pastila)\b/i,
+    weight: 24, label: 'страва' },
+
+  /*
+   * Імена в транслітерації. Навмисно ЛИШЕ ті написання, яких немає в
+   * англійській: Aleksandr, а не Alexander; Dmitriy, а не Dmitri. Інакше
+   * ловилися б «Roman Auto Body» та «Aaron's Movers».
+   */
+  { re: /\b(aleksandr|alexandr|dmitriy|dmitry|dmytro|lyudmila|liudmyla|yevgeni\w*|evgeni\w*|svitlana|svetlana|oksana|tetyana|tatyana|nadezhda|lyubov|raisa|zinaida|inessa|alla|galina|valentina|volodymyr|vyacheslav|anatoliy|gennadiy|arkady|arkadiy|vitaliy|mykola|taras|bohdan|ostap|yaroslav|ruslan|vadim|igor|iryna|irina|nataliya|nataliia)\b/i,
+    weight: 22, label: 'імʼя в транслітерації' },
+
+  /*
+   * Пострадянські, але російськомовні громади: Центральна Азія, Кавказ.
+   *
+   * Для продажу це та сама аудиторія — бізнес у Брукліні з узбецькою чи
+   * грузинською кухнею веде справи російською і сайт замовлятиме російською.
+   * Вага нижча, а мітка явна, щоб продажник бачив, з ким має справу.
+   */
+  { re: /\b(tashkent|uzbek\w*|samarqand|samarkand|bukhara|chayhana|chaikhana|chayxona|ustaxona|lagman|somsa|plov)\b/i,
+    weight: 16, label: 'Центральна Азія (російськомовні)' },
+  { re: /\b(georgian|sakartvelo|genatsvale|khachapuri|khinkali|mtskheta|tbilisi|berikoni|oda\s+house|supra)\b/i,
+    weight: 14, label: 'Грузія (російськомовні)' },
+  { re: /\b(armenian|yerevan|azerbaijan|baku)\b/i, weight: 12, label: 'Кавказ (російськомовні)' },
+
+  { re: /\b(baltic|belarus\w*|moldova|caucasus)\b/i, weight: 16, label: 'сусідній регіон' },
 ];
 
 /** Жорсткі виключення — інші слов'яни, які теж дадуть кирилицю/патерни. */
 const EXCLUDE = [
-  { re: /\b(polish|poland|polski|pierogi\s?polska)\b/i, label: 'polish' },
-  { re: /\b(serbian|croatian|bosnian|balkan|cevapi)\b/i, label: 'balkan' },
-  { re: /\b(bulgarian|bulgaria)\b/i, label: 'bulgarian' },
-  { re: /\b(czech|slovak|prague)\b/i, label: 'czech' },
+  /*
+   * Польські маркери. Список поповнено зі справжніх назв у базі: sklep,
+   * pączki, przychodnia, Lajkonik, Podkarpacie. У Чикаго польська громада
+   * більша за українську, тож ціна помилки тут висока.
+   */
+  { re: /\b(polish|poland|polska|polski|sklep|paczki|pączki|przychodnia|lajkonik|podkarpacie|piekarnia|kielbasa|zakopane|krakow|warszawa)\b/i, label: 'polish' },
+  { re: /\b(serbian|croatian|bosnian|balkan|cevapi|prodavnica|kulinarija|beograd|srpsk\w*)\b/i, label: 'balkan' },
+  { re: /\b(bulgarian|bulgaria|banitsa)\b/i, label: 'bulgarian' },
+  { re: /\b(czech|slovak|prague|praha)\b/i, label: 'czech' },
+  { re: /\b(romanian|romania|mamaliga|bucuresti)\b/i, label: 'romanian' },
   { re: POLISH_SURNAME_RE, label: 'polish surname' },
+  /*
+   * «Russian River» — річка й виноробний регіон у Каліфорнії, за годину їзди
+   * від Сакраменто. Без цього виключення кожна тамтешня автомайстерня
+   * отримувала б 26 балів за слово «Russian».
+   */
+  { re: /\brussian\s+river\b/i, label: 'Russian River (топонім Каліфорнії)' },
 ];
 
 export interface NameSignal {
@@ -71,12 +143,31 @@ export function nameSignal(businessName: string, websiteHost = ''): NameSignal {
 
   let score = 0;
 
+  /*
+   * Кирилиця в самій назві. Власник зареєстрував бізнес так, як говорить, —
+   * сперечатись нема з чим. Сербські гліфи вже відсіяні виключенням вище.
+   */
+  if (CYRILLIC_RE.test(businessName)) {
+    score += 35;
+    evidence.push({ signal: 'cyrillic_in_name', weight: 35, detail: 'кирилиця в назві бізнесу' });
+  }
+
+  /*
+   * Беремо НАЙСИЛЬНІШИЙ маркер, а не перший-ліпший.
+   *
+   * Раніше цикл зупинявся на першому збігу, тож результат залежав від порядку
+   * в масиві: «European Market & Deli "Beryozka"» отримував 22 за загальне
+   * «європейська гастрономія» і ніколи не доходив до «Beryozka» вагою 28.
+   * Складати ваги теж не можна — назва з трьома маркерами вистрелила б у стелю
+   * на порожньому місці.
+   */
+  let best: (typeof BRAND_MARKERS)[number] | null = null;
   for (const m of BRAND_MARKERS) {
-    if (m.re.test(haystack)) {
-      score += m.weight;
-      evidence.push({ signal: 'brand_marker', weight: m.weight, detail: `назва: ${m.label}` });
-      break; // один маркер достатньо, не накручуємо
-    }
+    if (m.re.test(haystack) && (!best || m.weight > best.weight)) best = m;
+  }
+  if (best) {
+    score += best.weight;
+    evidence.push({ signal: 'brand_marker', weight: best.weight, detail: `назва: ${best.label}` });
   }
 
   for (const s of SURNAME_PATTERNS) {

@@ -30,7 +30,7 @@
       "cemetery", "park", "tourist_attraction", "museum", "library",
       "primary_school", "secondary_school", "university", "school_district",
       "public_bath", "national_park", "historical_landmark", "monument",
-      "non_profit_organization", "association_or_organization", "community_center"
+      "non_profit_organization", "association_or_organization", "community_center", "cultural_center"
     ],
     "_excludeTypesComment": "Некомерційні заклади сайти не купують. Церкви й громадські центри мають ІДЕАЛЬНИЙ мовний скор (двомовний сайт, кирилиця, hreflang) і забивали б собою верх списку лідів. На пілоті 10 з 12 перших лідів були церквами й консульством України.",
 

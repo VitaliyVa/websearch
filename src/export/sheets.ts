@@ -18,6 +18,32 @@ export async function openDoc(): Promise<GoogleSpreadsheet> {
   return doc;
 }
 
+/**
+ * Ставить вкладку одразу за її сусідом зі списку TABS.
+ *
+ * Індекс із TABS напряму брати не можна: у таблиці є й чужі аркуші (службовий
+ * «Аркуш1», який Google створює сам). Через це «Ліди без сайту» з індексом 1
+ * стали ПЕРЕД «Leads». Тому орієнтуємось на фактичну позицію попередньої
+ * наявної вкладки, а не на порядковий номер у коді.
+ */
+async function positionTab(
+  doc: GoogleSpreadsheet,
+  sheet: GoogleSpreadsheetWorksheet,
+  title: string,
+): Promise<void> {
+  const order = Object.values(TABS) as string[];
+  const at = order.indexOf(title);
+  if (at <= 0) return;
+
+  for (let i = at - 1; i >= 0; i--) {
+    const prev = doc.sheetsByTitle[order[i]!];
+    if (!prev) continue;
+    const wanted = prev.index + 1;
+    if (sheet.index !== wanted) await sheet.updateProperties({ index: wanted });
+    return;
+  }
+}
+
 async function ensureTab(doc: GoogleSpreadsheet, title: string): Promise<GoogleSpreadsheetWorksheet> {
   let sheet = doc.sheetsByTitle[title];
   if (!sheet) {
@@ -26,6 +52,12 @@ async function ensureTab(doc: GoogleSpreadsheet, title: string): Promise<GoogleS
       headerValues: [...ALL_COLUMNS],
       gridProperties: { rowCount: 2000, columnCount: ALL_COLUMNS.length, frozenRowCount: 1 },
     });
+    /*
+     * Нова вкладка з'являється в кінці, а порядок має значення: продажник
+     * читає таблицю зліва направо, і «Ліди без сайту» мусять стояти поруч із
+     * «Leads», а не після тритисячної черги.
+     */
+    await positionTab(doc, sheet, title);
     log.ok(`Створено вкладку "${title}"`);
     return sheet;
   }
@@ -247,7 +279,7 @@ export async function collectHumanNotes(
 
   // Meta — службова вкладка на 2 колонки, лідів там немає.
   // Без цього фільтра loadCells падає з "Out of bounds, sheet is 23 by 2".
-  const leadTabs = [TABS.leads, TABS.manual, TABS.noSite, TABS.rejected];
+  const leadTabs = [TABS.leads, TABS.noSiteLeads, TABS.manual, TABS.noSite, TABS.rejected];
 
   for (const title of leadTabs) {
     const sheet = doc.sheetsByTitle[title];

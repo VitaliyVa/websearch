@@ -38,9 +38,27 @@ var ACCESS_CODES = {
   'zmina-2026-admin': 'Адмін',
 };
 
-var TAB_LEADS = 'Leads';
-var TAB_MANUAL = 'Manual review';
-var TAB_NO_SITE = 'NO_SITE';
+/**
+ * Вкладки віддаються СПИСКОМ, а не фіксованими полями.
+ *
+ * Раніше тут було три зашиті назви, і поява «Лідів без сайту» вимагала знову
+ * лізти в редактор і перерозгортати застосунок. Тепер скрипт читає всі
+ * вкладки, крім службових, і панель малює стільки кнопок, скільки прийшло —
+ * додавання вкладки в пайплайні більше нічого тут не міняє.
+ */
+var SERVICE_TABS = ['Meta', 'Аркуш1', 'Sheet1'];
+
+/** Порядок як у таблиці; ключ потрібен лише панелі для стабільного стану. */
+function tabKey(title) {
+  var map = {
+    'Leads': 'leads',
+    'Ліди без сайту': 'noSiteLeads',
+    'Manual review': 'manual',
+    'NO_SITE': 'noSite',
+    'Rejected': 'rejected',
+  };
+  return map[title] || title.toLowerCase().replace(/[^a-z0-9]+/g, '_');
+}
 
 /**
  * Машинні колонки пише пайплайн, людські — продажники. Скрипт торкається
@@ -138,11 +156,19 @@ function readAll() {
   if (hit) return JSON.parse(hit);
 
   var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var out = {leads: [], manual: [], noSite: [], statuses: STATUSES};
+  var out = {tabs: [], statuses: STATUSES};
 
-  out.leads = readTab(ss, TAB_LEADS);
-  out.manual = readTab(ss, TAB_MANUAL);
-  out.noSite = readTab(ss, TAB_NO_SITE);
+  var sheets = ss.getSheets();
+  for (var i = 0; i < sheets.length; i++) {
+    var title = sheets[i].getName();
+    if (SERVICE_TABS.indexOf(title) !== -1) continue;
+
+    var rows = readTab(ss, title);
+    // Порожні вкладки в панель не віддаємо — це лише зайва кнопка
+    if (!rows.length) continue;
+
+    out.tabs.push({key: tabKey(title), title: title, rows: rows});
+  }
 
   // Кеш на хвилину: при кількох продажниках прибирає більшість звернень
   // до Sheets і тримає застосунок швидким.
@@ -208,11 +234,12 @@ function updateLead(body, who) {
 
   try {
     var ss = SpreadsheetApp.getActiveSpreadsheet();
-    var tabs = [TAB_LEADS, TAB_MANUAL, TAB_NO_SITE];
+    // Шукаємо по всіх вкладках, крім службових: лід міг переїхати між ними
+    var sheets = ss.getSheets();
 
-    for (var t = 0; t < tabs.length; t++) {
-      var sheet = ss.getSheetByName(tabs[t]);
-      if (!sheet) continue;
+    for (var t = 0; t < sheets.length; t++) {
+      var sheet = sheets[t];
+      if (SERVICE_TABS.indexOf(sheet.getName()) !== -1) continue;
 
       var lastRow = sheet.getLastRow();
       if (lastRow < 2) continue;
@@ -239,7 +266,7 @@ function updateLead(body, who) {
         if (body.note !== undefined && cNote) sheet.getRange(rowNum, cNote).setValue(body.note);
 
         CacheService.getScriptCache().remove('leads_payload');
-        return {ok: true, tab: tabs[t], row: rowNum, owner: who};
+        return {ok: true, tab: sheet.getName(), row: rowNum, owner: who};
       }
     }
     return {ok: false, error: 'Лід не знайдено: ' + placeId};

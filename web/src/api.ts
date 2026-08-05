@@ -41,10 +41,21 @@ export interface Lead extends Record<string, unknown> {
   __tab: string;
 }
 
+/**
+ * Вкладки приходять списком, а не фіксованими полями.
+ *
+ * Так додавання вкладки в пайплайні («Ліди без сайту») не вимагає ні правок
+ * тут, ні перерозгортання Apps Script — панель малює стільки кнопок, скільки
+ * прийшло, у порядку самої таблиці.
+ */
+export interface Tab {
+  key: string;
+  title: string;
+  rows: Lead[];
+}
+
 export interface Payload {
-  leads: Lead[];
-  manual: Lead[];
-  noSite: Lead[];
+  tabs: Tab[];
   statuses: string[];
 }
 
@@ -59,6 +70,32 @@ function requireUrl(): string {
   return API_URL;
 }
 
+/**
+ * Приводить відповідь до вигляду зі списком вкладок.
+ *
+ * Старий Apps Script віддавав фіксовані поля `{leads, manual, noSite}`, новий —
+ * `{tabs:[…]}`. Панель і бекенд оновлюються нарізно (скрипт треба вставляти в
+ * редактор руками), тож між викоченнями існує вікно, коли працює стара версія.
+ * Без цієї сумісності панель у цей момент показала б продажникам порожній
+ * екран.
+ */
+function normalize(data: Record<string, unknown>): Payload {
+  const statuses = (data.statuses as string[]) ?? [];
+  if (Array.isArray(data.tabs)) return { tabs: data.tabs as Tab[], statuses };
+
+  const legacy: [string, string][] = [
+    ['leads', 'Leads'],
+    ['manual', 'Manual review'],
+    ['noSite', 'NO_SITE'],
+  ];
+  return {
+    tabs: legacy
+      .map(([key, title]) => ({ key, title, rows: (data[key] as Lead[]) ?? [] }))
+      .filter((t) => t.rows.length),
+    statuses,
+  };
+}
+
 export async function fetchLeads(code: string): Promise<{ user: string; data: Payload }> {
   const url = `${requireUrl()}?action=leads&code=${encodeURIComponent(code)}`;
   const res = await fetch(url, { redirect: 'follow' });
@@ -66,7 +103,7 @@ export async function fetchLeads(code: string): Promise<{ user: string; data: Pa
 
   const json = await res.json();
   if (!json.ok) throw new ApiError(json.error ?? 'Невідома помилка');
-  return { user: json.user, data: json.data };
+  return { user: json.user, data: normalize(json.data) };
 }
 
 /**
