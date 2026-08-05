@@ -152,6 +152,33 @@ export interface NameSignal {
   exclusion: string | null;
 }
 
+/**
+ * Власна етнічна класифікація Google — сигнал, який ми довго не помічали.
+ *
+ * `primary_type` буває `ukrainian_restaurant`, `russian_restaurant`,
+ * `eastern_european_restaurant`, `georgian_restaurant`. Це не здогад із назви,
+ * а мітка самого Google, побудована на меню, відгуках і категорії власника.
+ * По базі таких 47 місць — «Veselka», «Old Lviv», «Tatiana Restaurant» серед них.
+ */
+const ETHNIC_TYPES: { re: RegExp; weight: number; label: string }[] = [
+  { re: /^ukrainian_/, weight: 35, label: 'Google: український заклад' },
+  { re: /^russian_/, weight: 32, label: 'Google: російський заклад' },
+  { re: /^eastern_european_/, weight: 26, label: 'Google: східноєвропейський заклад' },
+  { re: /^(georgian|uzbek|armenian|azerbaijani)_/, weight: 16, label: 'Google: пострадянський заклад' },
+];
+
+/** Бал за типом закладу від Google. Незалежний від назви, тому додається окремо. */
+export function typeSignal(primaryType: string | null | undefined): NameSignal {
+  const t = (primaryType ?? '').toLowerCase();
+  const hit = ETHNIC_TYPES.find((e) => e.re.test(t));
+  if (!hit) return { score: 0, evidence: [], exclusion: null };
+  return {
+    score: hit.weight,
+    evidence: [{ signal: 'google_ethnic_type', weight: hit.weight, detail: `${hit.label} (${t})` }],
+    exclusion: null,
+  };
+}
+
 export function nameSignal(businessName: string, websiteHost = ''): NameSignal {
   const evidence: Evidence[] = [];
   const haystack = `${businessName} ${websiteHost.replace(/[.-]/g, ' ')}`;

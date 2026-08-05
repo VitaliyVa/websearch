@@ -117,6 +117,7 @@ export async function reviews(opts: ReviewsOpts) {
           placeId: place.place_id, name: place.name, website: place.website ?? '',
           typesJson: place.types_json, userRatingCount: place.user_rating_count,
           manualVerdict: place.manual_verdict, manualVerdictReason: place.manual_verdict_reason,
+              primaryType: place.primary_type,
         },
         audit: siteAudit,
         lang: siteLang,

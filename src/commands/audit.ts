@@ -4,7 +4,7 @@ import {
   getAudit, getPlaces, getReviewSignal, saveAudit, saveOwnerScore, setBucket, setStage,
 } from '../db/index.js';
 import { auditSite } from '../audit/site.js';
-import { nameSignal } from '../detect/name-signal.js';
+import { nameSignal, typeSignal } from '../detect/name-signal.js';
 import { estimateHours } from '../score/hours.js';
 import { scoreOwner } from '../score/owner.js';
 import { scoreSite } from '../score/quality.js';
@@ -82,6 +82,7 @@ export async function audit(opts: AuditOpts) {
               placeId: place.place_id, name: place.name, website: place.website!,
               typesJson: place.types_json, userRatingCount: place.user_rating_count,
               manualVerdict: place.manual_verdict, manualVerdictReason: place.manual_verdict_reason,
+              primaryType: place.primary_type,
             },
             audit: outcome.audit,
             lang: outcome.lang,
@@ -131,6 +132,8 @@ export interface DecideInput {
     name: string;
     website: string;
     typesJson?: string | null;
+    /** primary_type від Google — містить етнічну мітку закладу */
+    primaryType?: string | null;
     /** Потрібен, щоб переоцінка не воскрешала бізнеси, відсіяні за живістю */
     userRatingCount?: number | null;
     /** Вердикт людини. Якщо заданий — автоматика мовчить. */
@@ -215,7 +218,22 @@ export function decide(i: DecideInput) {
     return { bucket: 'rejected' as const, owner: null };
   }
 
-  const nm = nameSignal(i.place.name, hostOf(i.place.website));
+  /*
+   * Назва і тип від Google — незалежні сигнали, тож складаємо.
+   *
+   * «Veselka» словнику нічого не каже, але Google позначає її
+   * `ukrainian_restaurant`. І навпаки: «Beryozka European Market» упізнається
+   * за назвою, хоча тип у неї звичайний `grocery_store`.
+   */
+  const nmName = nameSignal(i.place.name, hostOf(i.place.website));
+  const nmType = typeSignal(i.place.primaryType);
+  const nm = nmName.exclusion
+    ? nmName
+    : {
+        score: Math.min(40, nmName.score + nmType.score),
+        evidence: [...nmName.evidence, ...nmType.evidence],
+        exclusion: null,
+      };
 
   const owner = scoreOwner({
     site: i.lang,
