@@ -360,7 +360,8 @@ export default function App() {
         </div>
       )}
 
-      <div style={{ ...row(8), marginTop: 20 }}>
+      {/* marginTop більший за звичайний: мітки «ukr/ru» виступають над кнопками */}
+      <div style={{ ...row(8), marginTop: 30 }}>
         {tabs.map((t) => (
           /* position: relative — щоб мітка «ukr/ru» сіла в правий верхній кут кнопки */
           <span key={t.key} style={{ position: 'relative', display: 'inline-flex' }}>
@@ -376,7 +377,12 @@ export default function App() {
                 aria-hidden="true"
                 style={{
                   position: 'absolute',
-                  top: -7,
+                  /*
+                   * -16 виведено заміром, а не на око: висота мітки 20 px, і
+                   * при -7 вона налазила на кнопку на 13 із 32 px — рівно там,
+                   * де текст. Тепер нижній край мітки лишається вище тексту.
+                   */
+                  top: -16,
                   right: -8,
                   background: '#059669',
                   color: '#fff',
