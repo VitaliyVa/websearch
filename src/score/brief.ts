@@ -50,9 +50,13 @@ export interface BriefInput {
 const YEAR = new Date().getFullYear();
 
 export function buildBrief(i: BriefInput): string {
-  const manual = i.manualNote?.startsWith('ручний розбір')
-    ? `Перевірено вручну: ${i.manualNote.replace(/^ручний розбір:\s*/, '')}.`
-    : '';
+  const note = i.manualNote ?? '';
+  const manual = note.startsWith('ручний розбір')
+    ? `Перевірено вручну: ${note.replace(/^ручний розбір:\s*/, '')}.`
+    // Попередження показуємо як є: воно вже сформульоване для продажника
+    : note.startsWith('увага:')
+      ? `${note[0]!.toUpperCase()}${note.slice(1)}.`
+      : '';
   return [business(i), site(i), problems(i), manual, hook(i)].filter(Boolean).join(' ');
 }
 

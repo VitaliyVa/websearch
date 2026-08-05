@@ -75,6 +75,44 @@ export async function exportSheets(opts: ExportOpts) {
   log.dim(`нотаток продажників знайдено: ${humanNotes.size}`);
 
   /*
+   * Лід, з яким уже працював продажник, НЕ зникає з таблиці — навіть якщо
+   * переоцінка перевела його в бакет, що не експортується.
+   *
+   * Без цього був тихий шлях до втрати роботи: `rescore` переводить лід у
+   * `rejected` (одного разу так переїхало 229 записів), вкладки Rejected у
+   * таблиці немає, рядок вичищається — а разом з ним статус, ім'я продажника
+   * і коментар. Нотатки збиралися, але відновлювати їх було нікуди.
+   *
+   * Тому такий рядок лишається на своєму місці. Машинні дані в ньому
+   * оновляться як звичайно, а в описі з'явиться попередження, що пайплайн
+   * більше не вважає його лідом.
+   */
+  const orphanNotes = [...humanNotes.keys()].filter((id) => !placeTab.has(id));
+  if (orphanNotes.length) {
+    const tabOf = new Map(allSheetRows().map((r) => [r.place_id, r.tab]));
+    let kept = 0;
+
+    for (const id of orphanNotes) {
+      const tabName = tabOf.get(id);
+      const t = tabName ? target.get(tabName) : undefined;
+      if (!t) continue;
+
+      const place = getPlaces('WHERE place_id = ?', [id])[0];
+      if (!place) continue;
+
+      t.places.push(place);
+      placeTab.set(id, tabName!);
+      kept++;
+    }
+
+    if (kept) {
+      log.warn(
+        `${kept} лідів пайплайн переоцінив, але з ними працювали — рядки лишено, статуси збережено`,
+      );
+    }
+  }
+
+  /*
    * Повністю очищаємо рядки, що покинули вкладку — разом із place_id.
    *
    * Раніше ключ лишався, і панель показувала «привидів»: вона виводить кожен
@@ -264,9 +302,18 @@ function buildRow(p: PlaceRow): SheetRow {
     datedMarkers: quality.datedMarkers,
     difficultyLabel: diff?.label ?? null,
     siteStatus: quality.status,
-    // Колонка називається reject_reason історично, але setBucket пише в неї
-    // причину БУДЬ-ЯКОГО переміщення, зокрема й переведення в Ліди руками
-    manualNote: p.reject_reason ?? null,
+    /*
+     * Колонка називається reject_reason історично, але setBucket пише в неї
+     * причину БУДЬ-ЯКОГО переміщення, зокрема й переведення в Ліди руками.
+     *
+     * Якщо запис уже відхилено, а рядок усе одно тут — значить його втримали
+     * заради нотаток продажника. Він має про це знати, інакше витрачатиме час
+     * на лід, який пайплайн уже забракував.
+     */
+    manualNote:
+      p.bucket === 'rejected'
+        ? `увага: пайплайн відхилив цей запис (${p.reject_reason ?? 'без причини'}), але рядок лишено, бо з ним уже працювали`
+        : p.reject_reason ?? null,
   });
 
   const screenshotCell = p.website
