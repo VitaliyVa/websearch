@@ -22,6 +22,7 @@ import {
 } from './api';
 import { BarList, ScoreHistogram, StatusDonut, countBy } from './charts';
 import { statusStyle } from './status';
+import { activityLabels, activityOptions, compareActivities, archiveLast } from './lead-filters';
 import {
   AlertTriangle, ChevronDown, Clock, ExternalLink, Gauge, Globe, Image as ImageIcon,
   Layers, Lock, Logout, Mail, MapPin, Phone, Refresh, ShieldOff, Smartphone,
@@ -40,6 +41,7 @@ const TAB_LABEL: Record<string, string> = {
   manual: 'Ручна перевірка',
   noSite: 'Без сайту',
   rejected: 'Відхилені',
+  archive: 'Архів',
 };
 
 /** Пояснення при наведенні — назва вкладки коротка, а зміст не завжди очевидний. */
@@ -54,6 +56,7 @@ const TAB_HINT: Record<string, string> = {
   manual: 'Сигналу не вистачило для рішення. Потрібне око людини.',
   noSite: 'Сайту немає, але мову власника НЕ підтверджено. Перевір перед дзвінком.',
   rejected: 'Відсіяні з причиною. Нічого не видалено — можна повернути.',
+  archive: 'Контакти попередньої кампанії зі збереженими статусами й нотатками.',
 };
 
 /**
@@ -141,6 +144,7 @@ export default function App() {
   const [tab, setTab] = useState<string>('leads');
   const [search, setSearch] = useState('');
   const [cityFilter, setCityFilter] = useState('');
+  const [activityFilter, setActivityFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [sortKey, setSortKey] = useState('Оцінка сайту 1-10');
   const [saving, setSaving] = useState<string | null>(null);
@@ -183,7 +187,7 @@ export default function App() {
     return () => window.removeEventListener('keydown', onKey);
   }, [zoom]);
 
-  const tabs = payload?.tabs ?? [];
+  const tabs = useMemo(() => archiveLast(payload?.tabs ?? []), [payload]);
   // Якщо активної вкладки більше немає (спорожніла), падаємо на першу наявну
   const rows = useMemo(
     () => tabs.find((t) => t.key === tab)?.rows ?? tabs[0]?.rows ?? [],
@@ -194,6 +198,8 @@ export default function App() {
     () => countBy(rows, (r) => String(r['Місто / район'] ?? '')).map(([c]) => c),
     [rows],
   );
+  const activities = useMemo(() => activityOptions(rows), [rows]);
+  const currentActivity = activities.includes(activityFilter) ? activityFilter : '';
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -210,6 +216,7 @@ export default function App() {
       );
     }
     if (cityFilter) out = out.filter((r) => String(r['Місто / район'] ?? '') === cityFilter);
+    if (currentActivity) out = out.filter((r) => activityLabels(r).includes(currentActivity));
     if (statusFilter) {
       out = out.filter((r) =>
         statusFilter === '__empty'
@@ -219,6 +226,7 @@ export default function App() {
     }
 
     return [...out].sort((a, b) => {
+      if (sortKey === 'Тип діяльності') return compareActivities(a, b);
       // Найгірший сайт спершу — це і є найкращий лід
       if (sortKey === 'Оцінка сайту 1-10') return num(a[sortKey]) - num(b[sortKey]);
       if (sortKey === 'Рейтинг / відгуки') return num(b[sortKey]) - num(a[sortKey]);
@@ -228,7 +236,7 @@ export default function App() {
       }
       return String(a['Назва компанії'] ?? '').localeCompare(String(b['Назва компанії'] ?? ''));
     });
-  }, [rows, search, cityFilter, statusFilter, sortKey]);
+  }, [rows, search, cityFilter, currentActivity, statusFilter, sortKey]);
 
   const onStatusChange = useCallback(
     async (lead: Lead, status: string) => {
@@ -370,7 +378,7 @@ export default function App() {
               size="md"
               variant={tab === t.key ? 'primary' : 'secondary'}
               tooltip={TAB_HINT[t.key]}
-              onClick={() => setTab(t.key)}
+              onClick={() => { setTab(t.key); setActivityFilter(''); }}
             />
             {isLangConfirmed(t.key, t.title) && (
               <span
@@ -496,6 +504,14 @@ export default function App() {
               ]}
             />
           </div>
+          <div style={{ minWidth: 220, flex: '1 1 220px' }}>
+            <Selector
+              label="Сфера діяльності"
+              value={currentActivity}
+              onChange={setActivityFilter}
+              options={[{ value: '', label: 'Усі сфери' }, ...activities.map((a) => ({ value: a, label: a }))]}
+            />
+          </div>
           <div style={{ minWidth: 220 }}>
             <Selector
               label="Сортувати"
@@ -507,6 +523,7 @@ export default function App() {
                 { value: 'Мовний скор', label: 'Найсильніший сигнал' },
                 { value: 'Складність розробки', label: 'Найбільший проєкт' },
                 { value: 'Назва компанії', label: 'За назвою' },
+                { value: 'Тип діяльності', label: 'За сферою діяльності (А–Я)' },
               ]}
             />
           </div>
