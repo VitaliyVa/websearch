@@ -145,6 +145,7 @@ export default function App() {
   const [search, setSearch] = useState('');
   const [cityFilter, setCityFilter] = useState('');
   const [activityFilter, setActivityFilter] = useState('');
+  const [visibleCount, setVisibleCount] = useState(50);
   const [statusFilter, setStatusFilter] = useState('');
   const [sortKey, setSortKey] = useState('Оцінка сайту 1-10');
   const [saving, setSaving] = useState<string | null>(null);
@@ -200,6 +201,10 @@ export default function App() {
   );
   const activities = useMemo(() => activityOptions(rows), [rows]);
   const currentActivity = activities.includes(activityFilter) ? activityFilter : '';
+
+  useEffect(() => {
+    setVisibleCount(50);
+  }, [tab, search, cityFilter, currentActivity, statusFilter, sortKey]);
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -532,7 +537,8 @@ export default function App() {
 
       <div style={{ ...row(8), margin: '16px 2px' }}>
         <Text type="supporting">
-          Показано {filtered.length} з {rows.length}
+          Показано {Math.min(visibleCount, filtered.length)} з {filtered.length}
+          {filtered.length !== rows.length && ` · у вкладці ${rows.length}`}
           {loadedAt &&
             ` · дані на ${loadedAt.toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' })}`}
         </Text>
@@ -546,7 +552,7 @@ export default function App() {
         */}
         {busy
           ? Array.from({ length: 4 }, (_, i) => <LeadCardSkeleton key={i} index={i} />)
-          : filtered.map((lead) => (
+          : filtered.slice(0, visibleCount).map((lead) => (
               <LeadCard
                 key={lead.place_id}
                 lead={lead}
@@ -558,6 +564,16 @@ export default function App() {
               />
             ))}
       </div>
+
+      {!busy && visibleCount < filtered.length && (
+        <div style={{ ...row(8), justifyContent: 'center', marginTop: 20 }}>
+          <Button
+            label={`Показати ще ${Math.min(50, filtered.length - visibleCount)}`}
+            variant="secondary"
+            onClick={() => setVisibleCount((count) => count + 50)}
+          />
+        </div>
+      )}
 
       {zoom && <Lightbox id={zoom.id} name={zoom.name} onClose={() => setZoom(null)} />}
     </div>
