@@ -10,19 +10,18 @@
  * решті — тільки мобільний. Мобільний і є головним доказом: саме на телефоні
  * старий сайт розсипається, і саме його показують клієнту.
  */
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { copyFileSync, existsSync, mkdirSync, statSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { getPlaces, getScreenshots } from '../src/db/index.js';
 import { log } from '../src/util/log.js';
 
 const OUT = resolve(process.cwd(), 'web/public/shots');
 
-// Чистимо, щоб скріни вибулих лідів не лишались у збірці назавжди
-if (existsSync(OUT)) rmSync(OUT, { recursive: true });
+// Архівні картки також використовують ці URL: зберігаємо наявні файли.
 mkdirSync(OUT, { recursive: true });
 
 const leadIds = new Set(getPlaces("WHERE bucket='leads'").map((p) => p.place_id));
-const all = getPlaces("WHERE bucket IN ('leads','manual','pending','no_site')");
+const all = getPlaces("WHERE archived_at IS NULL AND bucket IN ('leads','upsell','manual','pending','no_site','no_site_lead')");
 
 let copied = 0;
 let bytes = 0;
