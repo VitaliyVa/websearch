@@ -707,6 +707,7 @@ function LeadCard({
   const stars = countStars(lead['Складність розробки']);
   const brief = String(lead['Опис для продажника'] ?? '');
   const site = String(lead['Сайт'] ?? '');
+  const noWebsite = lead.__tab === 'Ліди без сайту' || lead.__tab === 'NO_SITE' || !site.trim() || site.trim() === '—';
   const phone = String(lead['Телефон'] ?? '');
   const email = String(lead['Email'] ?? '');
 
@@ -734,7 +735,12 @@ function LeadCard({
       <div style={{ padding: 18 }}>
         <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap', alignItems: 'flex-start' }}>
           {/* ── скріншот: найшвидший спосіб зрозуміти, про що взагалі мова ── */}
-          {hasShot && (
+          {noWebsite || !hasShot ? (
+            <div className="shot-placeholder" style={{ width: 104, height: 150 }}>
+              <ImageIcon size={26} />
+              <span>{noWebsite ? 'Нема сайту' : 'Немає знімка'}</span>
+            </div>
+          ) : (
             <div
               className="shot-frame"
               style={{ width: 104, height: 150 }}
